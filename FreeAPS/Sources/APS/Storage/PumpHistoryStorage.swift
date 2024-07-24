@@ -338,6 +338,7 @@ extension NightscoutTreatment {
                 targetBottom: nil
             )
         case .prime:
+            if event.amount != 0.7 { return nil }
             self.init(
                 duration: event.duration,
                 rawDuration: nil,
