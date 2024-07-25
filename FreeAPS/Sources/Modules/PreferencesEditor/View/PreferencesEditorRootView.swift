@@ -19,6 +19,8 @@ extension PreferencesEditor {
         }
 
         @State private var infoButtonPressed: InfoText?
+        @State private var guardrailHit = false
+        @State private var guardrailMessage = ""
 
         var body: some View {
             Form {
@@ -82,7 +84,22 @@ extension PreferencesEditor {
                     }
                 }
             }
-            .onAppear(perform: configureView)
+            .onAppear {
+                configureView()
+                Foundation.NotificationCenter.default.addObserver(
+                    forName: NSNotification.Name("guardrailHit"),
+                    object: nil,
+                    queue: .main
+                ) { notification in
+                    if let message = notification.userInfo?["message"] as? String {
+                        guardrailMessage = message
+                        guardrailHit = true
+                    }
+                }
+            }
+            .onDisappear {
+                Foundation.NotificationCenter.default.removeObserver(self, name: .guardrailHit, object: nil)
+            }
             .navigationTitle("Preferences")
             .navigationBarTitleDisplayMode(.automatic)
             .navigationBarItems(
@@ -114,6 +131,16 @@ extension PreferencesEditor {
                     title: Text("\(infoButton.oref0Variable)"),
                     message: Text("\(infoButton.description)"),
                     dismissButton: .default(Text("OK"))
+                )
+            }
+            .alert(isPresented: $guardrailHit) {
+                Alert(
+                    title: Text("Invalid Entry"),
+                    message: Text(guardrailMessage),
+                    dismissButton: .default(Text("OK")) {
+                        self.guardrailHit = false
+                        self.guardrailMessage = ""
+                    }
                 )
             }
         }

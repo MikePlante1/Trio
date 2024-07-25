@@ -6,6 +6,10 @@ extension Bool: SettableValue {}
 extension Decimal: SettableValue {}
 extension InsulinCurve: SettableValue {}
 
+extension Notification.Name {
+    static let guardrailHit = Notification.Name("guardrailHit")
+}
+
 enum PreferencesEditor {
     enum Config {}
 
@@ -62,17 +66,29 @@ enum PreferencesEditor {
             case let (.boolean(keypath), value as Bool):
                 settable?.set(keypath, value: value)
             case let (.decimal(keypath, minVal, maxVal), value as Decimal):
+                var message = ""
                 let constrainedValue: Decimal
                 if let minValue = minVal, let minValueDecimal: Decimal = settable?.get(minValue), let maxValue = maxVal,
                    let maxValueDecimal: Decimal = settable?.get(maxValue)
                 {
                     constrainedValue = min(max(value, minValueDecimal), maxValueDecimal)
+                    message =
+                        "\(value) is invalid.\nSet to: \(constrainedValue)\n\nMin: \(minValueDecimal)\nMax: \(maxValueDecimal)"
                 } else if let minValue = minVal, let minValueDecimal: Decimal = settable?.get(minValue) {
                     constrainedValue = max(value, minValueDecimal)
+                    message = "\(value) is invalid.\nSet to: \(constrainedValue)\n\nMin: \(minValueDecimal)"
                 } else if let maxValue = maxVal, let maxValueDecimal: Decimal = settable?.get(maxValue) {
                     constrainedValue = min(value, maxValueDecimal)
+                    message = "\(value) is invalid.\nSet to: \(constrainedValue)\n\nMax: \(maxValueDecimal)"
                 } else {
                     constrainedValue = value
+                }
+                if constrainedValue != value {
+                    Foundation.NotificationCenter.default.post(
+                        name: .guardrailHit,
+                        object: nil,
+                        userInfo: ["message": message]
+                    )
                 }
                 settable?.set(keypath, value: constrainedValue)
             case let (.insulinCurve(keypath), value as InsulinCurve):
