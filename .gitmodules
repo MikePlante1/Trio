@@ -44,3 +44,6 @@
 [submodule "EversenseKit"]
 	path = EversenseKit
 	url = https://github.com/bastiaanv/EversenseKit.git
+[submodule "MedtrumKit"]
+	path = MedtrumKit
+	url = https://github.com/bastiaanv/MedtrumKit
