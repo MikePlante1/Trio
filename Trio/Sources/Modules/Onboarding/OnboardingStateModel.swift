@@ -3,6 +3,7 @@ import DanaKit
 import FirebaseCrashlytics
 import Foundation
 import LoopKit
+import MedtrumKit
 import MinimedKit
 import Observation
 import OmniBLE
@@ -122,6 +123,8 @@ extension Onboarding {
                         defaultOption = .dana
                     } else if pumpManager is MinimedPumpManager {
                         defaultOption = .minimed
+                    } else if pumpManager is MedtrumPumpManager {
+                        defaultOption = .medtrum
                     } else {
                         defaultOption = .omnipodDash
                     }
@@ -162,6 +165,8 @@ extension Onboarding {
             case .omnipodDash:
                 return PickerSetting(value: 0.1, step: 0.05, min: 0, max: 30, type: .insulinUnitPerHour)
             case .omnipodEros:
+                return PickerSetting(value: 0.1, step: 0.05, min: 0.05, max: 30, type: .insulinUnitPerHour)
+            case .medtrum:
                 return PickerSetting(value: 0.1, step: 0.05, min: 0.05, max: 30, type: .insulinUnitPerHour)
             case .none:
                 // same as dash, as that is the fallback
