@@ -256,10 +256,11 @@
 		3BD6CE262DC24CFD00FA0472 /* pumphistory-24h-zoned.json in Resources */ = {isa = PBXBuildFile; fileRef = 3BD6CE252DC24CFD00FA0472 /* pumphistory-24h-zoned.json */; };
 		3BD9687C2D8DDD4600899469 /* SlideButton in Frameworks */ = {isa = PBXBuildFile; productRef = 3BD9687B2D8DDD4600899469 /* SlideButton */; };
 		3BD9687F2D8DDD8800899469 /* CryptoSwift in Frameworks */ = {isa = PBXBuildFile; productRef = 3BD9687E2D8DDD8800899469 /* CryptoSwift */; };
-		3E94E2F62DF72793005C358C /* MedtrumKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3E94E2F52DF72793005C358C /* MedtrumKit.framework */; };
-		3E94E2F72DF72793005C358C /* MedtrumKit.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 3E94E2F52DF72793005C358C /* MedtrumKit.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		3E470F0D2DFA147500ACAF34 /* MedtrumKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3E94E2F52DF72793005C358C /* MedtrumKit.framework */; };
+		3E470F0E2DFA147500ACAF34 /* MedtrumKit.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 3E94E2F52DF72793005C358C /* MedtrumKit.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		3E9D22DE2DF729A0005E4DAA /* EversenseKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3E9D22DD2DF729A0005E4DAA /* EversenseKit.framework */; };
 		3E9D22DF2DF729A0005E4DAA /* EversenseKit.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 3E9D22DD2DF729A0005E4DAA /* EversenseKit.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		3E9D23ED2DF72D07005E4DAA /* ConfigOverride.xcconfig in Resources */ = {isa = PBXBuildFile; fileRef = 3E9D23EC2DF72D07005E4DAA /* ConfigOverride.xcconfig */; };
 		45252C95D220E796FDB3B022 /* ConfigEditorDataFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F8A87AA037BD079BA3528BA /* ConfigEditorDataFlow.swift */; };
 		45717281F743594AA9D87191 /* ConfigEditorRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 920DDB21E5D0EB813197500D /* ConfigEditorRootView.swift */; };
 		491D6FBD2D56741C00C49F67 /* TempTargetStored+CoreDataProperties.swift in Sources */ = {isa = PBXBuildFile; fileRef = 491D6FBC2D56741C00C49F67 /* TempTargetStored+CoreDataProperties.swift */; };
@@ -772,9 +773,9 @@
 				3B4BA76D2D8DBD690069D5B8 /* CGMBLEKitUI.framework in Embed Frameworks */,
 				3B4BA76B2D8DBD690069D5B8 /* CGMBLEKit.framework in Embed Frameworks */,
 				3B4BA7792D8DBD690069D5B8 /* MinimedKit.framework in Embed Frameworks */,
+				3E470F0E2DFA147500ACAF34 /* MedtrumKit.framework in Embed Frameworks */,
 				CE95BF5C2BA770C300DC3DE3 /* LoopKit.framework in Embed Frameworks */,
 				3B4BA7712D8DBD690069D5B8 /* G7SensorKit.framework in Embed Frameworks */,
-				3E94E2F72DF72793005C358C /* MedtrumKit.framework in Embed Frameworks */,
 				CEB434FE28B90B8C00B70274 /* SwiftCharts in Embed Frameworks */,
 				3B4BA7812D8DBD690069D5B8 /* OmniKitUI.framework in Embed Frameworks */,
 				3B4BA76F2D8DBD690069D5B8 /* DanaKit.framework in Embed Frameworks */,
@@ -1078,6 +1079,7 @@
 		3BF768BD6264FF7D71D66767 /* NightscoutConfigProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NightscoutConfigProvider.swift; sourceTree = "<group>"; };
 		3E94E2F52DF72793005C358C /* MedtrumKit.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; path = MedtrumKit.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		3E9D22DD2DF729A0005E4DAA /* EversenseKit.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; path = EversenseKit.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		3E9D23EC2DF72D07005E4DAA /* ConfigOverride.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = ConfigOverride.xcconfig; path = ../ConfigOverride.xcconfig; sourceTree = SOURCE_ROOT; };
 		3F60E97100041040446F44E7 /* PumpConfigStateModel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PumpConfigStateModel.swift; sourceTree = "<group>"; };
 		3F8A87AA037BD079BA3528BA /* ConfigEditorDataFlow.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ConfigEditorDataFlow.swift; sourceTree = "<group>"; };
 		42369F66CF91F30624C0B3A6 /* BasalProfileEditorProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BasalProfileEditorProvider.swift; sourceTree = "<group>"; };
@@ -1556,10 +1558,10 @@
 				3B4BA7742D8DBD690069D5B8 /* LibreTransmitter.framework in Frameworks */,
 				3B4BA78C2D8DC0EC0069D5B8 /* ShareClientUI.framework in Frameworks */,
 				3B4BA77A2D8DBD690069D5B8 /* MinimedKitUI.framework in Frameworks */,
+				3E470F0D2DFA147500ACAF34 /* MedtrumKit.framework in Frameworks */,
 				3BD9687C2D8DDD4600899469 /* SlideButton in Frameworks */,
 				3B4BA7782D8DBD690069D5B8 /* MinimedKit.framework in Frameworks */,
 				3B4BA7762D8DBD690069D5B8 /* LibreTransmitterUI.framework in Frameworks */,
-				3E94E2F62DF72793005C358C /* MedtrumKit.framework in Frameworks */,
 				3B4BA7902D8DC0EC0069D5B8 /* TidepoolServiceKitUI.framework in Frameworks */,
 				3B4BA76A2D8DBD690069D5B8 /* CGMBLEKit.framework in Frameworks */,
 				3B4BA77C2D8DBD690069D5B8 /* OmniBLE.framework in Frameworks */,
@@ -2291,6 +2293,7 @@
 				CE1F6DE62BAF1A180064EB8D /* BuildDetails.plist */,
 				38F3783A2613555C009DB701 /* Config.xcconfig */,
 				BD1CF8B72C1A4A8400CB930A /* ConfigOverride.xcconfig */,
+				3E9D23EC2DF72D07005E4DAA /* ConfigOverride.xcconfig */,
 				388E595A25AD948C0019842D /* Trio */,
 				587A54C82BCDCE0F009D38E2 /* Model */,
 				38FCF3EE25E9028E0078B0D1 /* TrioTests */,
@@ -3946,6 +3949,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				3E9D23ED2DF72D07005E4DAA /* ConfigOverride.xcconfig in Resources */,
 				8A91342C2D63D9A2007F8874 /* InfoPlist.xcstrings in Resources */,
 				CE1F6DE72BAF1A180064EB8D /* BuildDetails.plist in Resources */,
 				3B3B57C92DA07B3400849D16 /* GoogleService-Info.plist in Resources */,
