@@ -333,6 +333,8 @@ struct OnboardingStepContent: View {
                                     NightscoutSetupStepView(state: state)
                                 case .connectToNightscout:
                                     NightscoutLoginStepView(state: state)
+                                case .uploadToNightscout:
+                                    NightscoutUploadStepView(state: state)
                                 case .importFromNightscout:
                                     NightscoutImportStepView(state: state)
                                 }

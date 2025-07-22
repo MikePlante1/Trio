@@ -100,6 +100,8 @@ extension Onboarding {
         var isConnectedToNS: Bool = false
         var nightscoutImportError: NightscoutImportError?
         var nightscoutImportStatus: ImportStatus = .none
+        var isUploadEnabled: Bool = true
+        var uploadGlucose: Bool = true
 
         // MARK: - Units and Pump Omboarding Option
 
