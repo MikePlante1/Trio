@@ -519,7 +519,7 @@ enum PumpOptionForOnboardingUnits: String, Equatable, CaseIterable, Identifiable
         case .dana:
             return "Dana (RS/-i)"
         case .medtrum:
-            return "Metrum Nano"
+            return "Medtrum Nano"
         }
     }
 }
