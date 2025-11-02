@@ -23,8 +23,9 @@ struct LiveActivityView: View {
 
         return Color.getDynamicGlucoseColor(
             glucoseValue: Decimal(string: state.bg) ?? 100,
-            highGlucoseColorValue: !hasStaticColorScheme ? hardCodedHigh : state.highGlucose,
-            lowGlucoseColorValue: !hasStaticColorScheme ? hardCodedLow : state.lowGlucose,
+            highGlucoseColorValue: !hasStaticColorScheme ? hardCodedHigh :
+                (isMgdL ? state.highGlucose : state.highGlucose.asMmolL),
+            lowGlucoseColorValue: !hasStaticColorScheme ? hardCodedLow : (isMgdL ? state.lowGlucose : state.lowGlucose.asMmolL),
             targetGlucose: isMgdL ? state.target : state.target.asMmolL,
             glucoseColorScheme: state.glucoseColorScheme
         )
@@ -33,7 +34,7 @@ struct LiveActivityView: View {
     var body: some View {
         if isWatchOS, context.state.useDetailedViewWatchOS {
             VStack {
-                LiveActivityBGLabelWatchView(context: context, glucoseColor: .primary)
+                LiveActivityBGLabelWatchView(context: context, glucoseColor: glucoseColor)
                 LiveActivityChartView(context: context, additionalState: context.state.detailedViewState)
                     .frame(maxWidth: UIScreen.main.bounds.width * 0.9)
             }
@@ -51,7 +52,7 @@ struct LiveActivityView: View {
                         context: context,
                         glucoseColor: .primary
                     )
-                    LiveActivityUpdatedLabelView(context: context, isDetailedLayout: false, isWatchOS: true)
+                    LiveActivityUpdatedLabelView(context: context, isDetailedLayout: false)
                 }
             }
             .addLiveActivityModifiers(isWatchOS: true)
@@ -111,7 +112,7 @@ struct LiveActivityView: View {
                             case .cob:
                                 LiveActivityCOBLabelView(context: context, additionalState: context.state.detailedViewState)
                             case .updatedLabel:
-                                LiveActivityUpdatedLabelView(context: context, isDetailedLayout: true, isWatchOS: false)
+                                LiveActivityUpdatedLabelView(context: context, isDetailedLayout: true)
                             case .totalDailyDose:
                                 LiveActivityTotalDailyDoseView(
                                     context: context,
@@ -151,7 +152,7 @@ struct LiveActivityView: View {
                                 context: context,
                                 glucoseColor: hasStaticColorScheme ? .primary : glucoseColor
                             ).font(.title3)
-                            LiveActivityUpdatedLabelView(context: context, isDetailedLayout: false, isWatchOS: false)
+                            LiveActivityUpdatedLabelView(context: context, isDetailedLayout: false)
                                 .font(.caption)
                                 .foregroundStyle(.primary.opacity(0.7))
                         }
@@ -201,7 +202,8 @@ struct LiveActivityExpandedCenterView: View {
     var context: ActivityViewContext<LiveActivityAttributes>
 
     var body: some View {
-        LiveActivityUpdatedLabelView(context: context, isDetailedLayout: false, isWatchOS: false).font(Font.caption)
+        LiveActivityUpdatedLabelView(context: context, isDetailedLayout: false)
+            .font(Font.caption)
             .foregroundStyle(Color.secondary)
             .addIsWatchOS()
     }

@@ -3,9 +3,10 @@ import SwiftUI
 import WidgetKit
 
 struct LiveActivityUpdatedLabelView: View {
+    @Environment(\.isWatchOS) var isWatchOS
+
     var context: ActivityViewContext<LiveActivityAttributes>
     var isDetailedLayout: Bool
-    var isWatchOS: Bool
 
     private var dateFormatter: DateFormatter {
         let formatter = DateFormatter()

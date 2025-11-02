@@ -15,17 +15,18 @@ struct LiveActivityBGLabelWatchView: View {
     var body: some View {
         HStack {
             Text(context.state.bg)
-                .fontWeight(.bold)
+                .bold()
                 .font(.callout)
                 .foregroundStyle(context.isStale ? .secondary : glucoseColor)
                 .strikethrough(context.isStale, pattern: .solid, color: .red.opacity(0.6))
 
             if let trendArrow = context.state.direction {
                 Text(trendArrow)
-                    .fontWeight(.bold)
+                    .bold()
                     .font(.callout)
                     .foregroundStyle(context.isStale ? .secondary : glucoseColor)
                     .strikethrough(context.isStale, pattern: .solid, color: .red.opacity(0.6))
+                    .padding(.leading, -5)
             }
 
             Text(context.state.change)
@@ -37,8 +38,7 @@ struct LiveActivityBGLabelWatchView: View {
 
             Text("\((context.state.date != nil) ? dateFormatter.string(from: context.state.date!) : "--")")
                 .font(.callout)
-                .bold()
-                .foregroundStyle(context.isStale ? .red.opacity(0.6) : .secondary)
+                .foregroundStyle(context.isStale ? .red.opacity(0.6) : .primary)
                 .strikethrough(context.isStale, pattern: .solid, color: .red.opacity(0.6))
         }
     }
