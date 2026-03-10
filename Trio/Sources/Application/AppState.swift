@@ -4,6 +4,8 @@ import SwiftUI
 import UIKit
 
 @Observable class AppState {
+    var bottomSafeAreaGlitchExtraPadding: CGFloat = 0
+
     func trioBackgroundColor(for colorScheme: ColorScheme) -> LinearGradient {
         colorScheme == .dark
             ? LinearGradient(

@@ -34,6 +34,7 @@ extension Home {
         @State var showPumpSelection: Bool = false
         @State var showCGMSelection: Bool = false
         @State var notificationsDisabled = false
+        @State private var lastKnownBottomInset: CGFloat = 0
         @State var timeButtons: [TimePicker] = [
             TimePicker(active: false, hours: 4),
             TimePicker(active: false, hours: 6),
@@ -991,7 +992,29 @@ extension Home {
 
         @ViewBuilder func mainView() -> some View {
             GeometryReader { geo in
+                let bottomInset = geo.safeAreaInsets.bottom
+                let glitchExtraPadding: CGFloat = {
+                    if lastKnownBottomInset > 50, bottomInset < 50 {
+                        return lastKnownBottomInset - bottomInset
+                    }
+                    return 0
+                }()
                 mainViewElements(geo)
+                    .frame(maxHeight: geo.size.height - glitchExtraPadding)
+                    .onAppear {
+                        if bottomInset > 50 {
+                            lastKnownBottomInset = bottomInset
+                        }
+                        appState.bottomSafeAreaGlitchExtraPadding = glitchExtraPadding
+                    }
+                    .onChange(of: bottomInset) {
+                        if bottomInset > 50 {
+                            lastKnownBottomInset = bottomInset
+                        }
+                        let newPadding: CGFloat = (lastKnownBottomInset > 50 && bottomInset < 50)
+                            ? lastKnownBottomInset - bottomInset : 0
+                        appState.bottomSafeAreaGlitchExtraPadding = newPadding
+                    }
             }
             .onChange(of: state.hours) {
                 highlightButtons()
