@@ -214,6 +214,9 @@ jobs:
           # Several patches may be added per submodule.
           # Adding comments (#) is strongly recommended to easily tell the individual patches apart.
 
+          # keep-pod-alive for OmniBLE
+          curl https://github.com/LoopKit/OmniBLE/commit/dade6ed309eb72232a187d88179a367e34f800d9.patch | git apply --directory=OmniBLE -v --whitespace=fix
+
       # Patch Fastlane Match to not print tables
       - name: Patch Match Tables
         run: |
