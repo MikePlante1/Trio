@@ -1,4 +1,4 @@
-[![Discord](https://img.shields.io/discord/SERVER_ID?label=Discord&logo=discord&logoColor=white&color=5865F2)](https://discord.gg/YOUR_INVITE)
+[![Discord](https://img.shields.io/discord/SERVER_ID?label=Discord&logo=discord&logoColor=white&color=5865F2)](https://discord.triodocs.org)
 
 # Trio
 
