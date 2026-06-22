@@ -24,7 +24,7 @@ struct GlucoseChartView: ChartContent {
             let hardCodedHigh = Decimal(220)
             let isDynamicColorScheme = glucoseColorScheme == .dynamicColor
 
-            let pointMarkColor: Color = Trio.getDynamicGlucoseColor(
+            let rangeColor: Color = Trio.getDynamicGlucoseColor(
                 glucoseValue: Decimal(item.glucose),
                 highGlucoseColorValue: isDynamicColorScheme ? hardCodedHigh : highGlucose,
                 lowGlucoseColorValue: isDynamicColorScheme ? hardCodedLow : lowGlucose,
@@ -32,12 +32,19 @@ struct GlucoseChartView: ChartContent {
                 glucoseColorScheme: glucoseColorScheme
             )
 
+            // Readings the algorithm didn't use (the extra readings stored from a native
+            // 1-minute CGM) are display-only: shown muted/grey and smaller so the readings
+            // oref actually used stand out, colored by range. Manual fingersticks are always
+            // algorithm readings, so they keep the red drop.
+            let isDisplayOnly = !item.isAlgorithmReading
+            let pointMarkColor: Color = isDisplayOnly ? Color.secondary.opacity(0.6) : rangeColor
+
             PointMark(
                 x: .value("Time", item.date ?? Date(), unit: .second),
                 y: .value("Value", glucoseToDisplay)
             )
             .foregroundStyle(pointMarkColor)
-            .symbolSize(20)
+            .symbolSize(isDisplayOnly ? 8 : 20)
             .symbol {
                 if item.isManual {
                     Image(systemName: "drop.fill")
@@ -47,7 +54,7 @@ struct GlucoseChartView: ChartContent {
                         .foregroundStyle(.red)
                 } else {
                     Image(systemName: "circle.fill")
-                        .font(.system(size: 5))
+                        .font(.system(size: isDisplayOnly ? 3 : 5))
                         .bold()
                         .foregroundStyle(pointMarkColor)
                 }
