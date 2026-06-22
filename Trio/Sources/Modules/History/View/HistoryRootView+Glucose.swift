@@ -12,7 +12,7 @@ extension History.RootView {
                 }
                 // Explain the fade once, and only when there are display-only readings
                 // (a native 1-min CGM); 5-min CGMs flag every reading, so nothing fades.
-                if glucoseStored.contains(where: { !$0.isAlgorithmReading }) {
+                if glucoseStored.contains(where: { $0.isDisplayOnly }) {
                     Text("Faded entries are display-only, not sent to the algorithm")
                         .font(.caption2)
                 }
@@ -23,7 +23,7 @@ extension History.RootView {
                     // Readings the algorithm didn't use (extra readings from a native
                     // 1-minute CGM) are display-only — faded so it's clear at a glance which
                     // readings oref actually used. Manuals are always algorithm readings.
-                    let isDisplayOnly = !glucose.isAlgorithmReading
+                    let isDisplayOnly = glucose.isDisplayOnly
                     HStack {
                         Text(formatGlucose(Decimal(glucose.glucose), isManual: glucose.isManual))
 

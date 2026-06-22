@@ -417,9 +417,10 @@ final class LiveActivityData: ObservableObject {
             new: bg,
             prev: prevGlucose,
             units: settings.units,
-            // Plot only algorithm readings (~5-min) so a native 1-min CGM doesn't shrink
-            // the chart's time span; the labels above still use the 1-min readings.
-            chart: glucose.filter { $0.isAlgorithmReading },
+            // Plot only the ~5-min algorithm readings (skip display-only) so a native
+            // 1-min CGM doesn't shrink the chart's time span; the labels above still
+            // use the 1-min readings.
+            chart: glucose.filter { !$0.isDisplayOnly },
             settings: settings,
             determination: determination,
             iob: data.iob,

@@ -278,7 +278,12 @@ extension PluginSource: CGMManagerDelegate {
                     type: "sgv",
                     activationDate: sensorActivatedAt,
                     sessionStartDate: sensorStartDate,
-                    transmitterID: sensorTransmitterID
+                    transmitterID: sensorTransmitterID,
+                    // Honor the source's display-only flag (e.g. LibreLoop's
+                    // "display-only extras" mode marks the 1-min readings between
+                    // its ~5-min canonical ones). Used by GlucoseStorage to keep
+                    // those out of the algorithm-reading set.
+                    isDisplayOnly: newGlucoseSample.isDisplayOnly
                 )
             }
             return .success(bloodGlucose)

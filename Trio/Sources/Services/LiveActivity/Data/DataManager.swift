@@ -28,7 +28,7 @@ extension LiveActivityManager {
                     glucose: Int($0.glucose),
                     date: $0.date ?? Date(),
                     direction: $0.directionEnum,
-                    isAlgorithmReading: $0.isAlgorithmReading
+                    isDisplayOnly: $0.isDisplayOnly
                 )
             }
         }

@@ -36,7 +36,7 @@ struct GlucoseChartView: ChartContent {
             // 1-minute CGM) are display-only: shown muted/grey and smaller so the readings
             // oref actually used stand out, colored by range. Manual fingersticks are always
             // algorithm readings, so they keep the red drop.
-            let isDisplayOnly = !item.isAlgorithmReading
+            let isDisplayOnly = item.isDisplayOnly
             let pointMarkColor: Color = isDisplayOnly ? rangeColor.opacity(0.6) : rangeColor
 
             PointMark(

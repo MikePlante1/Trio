@@ -243,7 +243,7 @@ final class BaseGlucoseStorage: GlucoseStorage, Injectable {
         // Anchor to the last algorithm reading already stored before this batch.
         let request = GlucoseStored.fetchRequest()
         request.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [
-            NSPredicate(format: "isAlgorithmReading == YES"),
+            NSPredicate(format: "isDisplayOnly == NO"),
             NSPredicate(format: "date < %@", earliest as NSDate)
         ])
         request.sortDescriptors = [NSSortDescriptor(keyPath: \GlucoseStored.date, ascending: false)]
@@ -254,6 +254,11 @@ final class BaseGlucoseStorage: GlucoseStorage, Injectable {
 
         var algorithmDates = Set<Date>()
         for entry in sorted {
+            // Source-flagged display-only readings (e.g. LibreLoop's 1-min extras
+            // between its ~5-min canonical ones) are never algorithm readings,
+            // regardless of spacing. nil (sources that don't flag) falls through to
+            // the interval check, so every other CGM keeps the spacing behavior.
+            if entry.isDisplayOnly == true { continue }
             let date = entry.dateString
             if date.timeIntervalSince(lastAlgorithmDate) >= Config.algorithmReadingInterval {
                 algorithmDates.insert(date)
@@ -266,7 +271,7 @@ final class BaseGlucoseStorage: GlucoseStorage, Injectable {
     private func storeGlucoseRegular(_ glucose: [BloodGlucose], algorithmDates: Set<Date>) throws {
         for entry in glucose {
             let glucoseEntry = GlucoseStored(context: context)
-            configureGlucoseEntry(glucoseEntry, with: entry, isAlgorithmReading: algorithmDates.contains(entry.dateString))
+            configureGlucoseEntry(glucoseEntry, with: entry, isDisplayOnly: !algorithmDates.contains(entry.dateString))
         }
 
         guard context.hasChanges else { return }
@@ -288,7 +293,7 @@ final class BaseGlucoseStorage: GlucoseStorage, Injectable {
                 self.configureGlucoseEntry(
                     glucoseEntry,
                     with: entry,
-                    isAlgorithmReading: algorithmDates.contains(entry.dateString)
+                    isDisplayOnly: !algorithmDates.contains(entry.dateString)
                 )
                 return false
             }
@@ -297,12 +302,12 @@ final class BaseGlucoseStorage: GlucoseStorage, Injectable {
         updateSubject.send()
     }
 
-    private func configureGlucoseEntry(_ entry: GlucoseStored, with glucose: BloodGlucose, isAlgorithmReading: Bool) {
+    private func configureGlucoseEntry(_ entry: GlucoseStored, with glucose: BloodGlucose, isDisplayOnly: Bool) {
         entry.id = UUID()
         entry.glucose = Int16(glucose.glucose ?? 0)
         entry.date = glucose.dateString
         entry.direction = glucose.direction?.rawValue
-        entry.isAlgorithmReading = isAlgorithmReading
+        entry.isDisplayOnly = isDisplayOnly
         entry.isUploadedToNS = false
         entry.isUploadedToHealth = false
         entry.isUploadedToTidepool = false
@@ -382,8 +387,8 @@ final class BaseGlucoseStorage: GlucoseStorage, Injectable {
             newItem.date = Date()
             newItem.glucose = Int16(glucose)
             newItem.isManual = true
-            // Manual fingersticks are always handed to the algorithm.
-            newItem.isAlgorithmReading = true
+            // Manual fingersticks are always handed to the algorithm (never display-only).
+            newItem.isDisplayOnly = false
             newItem.isUploadedToNS = false
             newItem.isUploadedToHealth = false
             newItem.isUploadedToTidepool = false

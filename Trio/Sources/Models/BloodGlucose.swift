@@ -137,7 +137,8 @@ struct BloodGlucose: JSON, Identifiable, Hashable, Codable {
         type: String? = nil,
         activationDate: Date? = nil,
         sessionStartDate: Date? = nil,
-        transmitterID: String? = nil
+        transmitterID: String? = nil,
+        isDisplayOnly: Bool? = nil
     ) {
         self.id = id
         self.legacyId = legacyId
@@ -154,6 +155,7 @@ struct BloodGlucose: JSON, Identifiable, Hashable, Codable {
         self.activationDate = activationDate
         self.sessionStartDate = sessionStartDate
         self.transmitterID = transmitterID
+        self.isDisplayOnly = isDisplayOnly
     }
 
     let legacyId: String?
@@ -171,6 +173,12 @@ struct BloodGlucose: JSON, Identifiable, Hashable, Codable {
     var activationDate: Date? = nil
     var sessionStartDate: Date? = nil
     var transmitterID: String? = nil
+    /// Transient (intentionally NOT in `CodingKeys`, so it's never serialized):
+    /// true when the CGM source forwarded this reading as display-only
+    /// (LoopKit `NewGlucoseSample.isDisplayOnly`). Such readings are stored and
+    /// charted but never flagged as algorithm readings. nil for sources that
+    /// don't distinguish, which then fall back to interval-based selection.
+    var isDisplayOnly: Bool? = nil
     var isStateValid: Bool { sgv ?? 0 >= 39 && noise ?? 1 != 4 }
 
     static func == (lhs: BloodGlucose, rhs: BloodGlucose) -> Bool {
