@@ -4,14 +4,26 @@ import SwiftUI
 extension History.RootView {
     var glucoseList: some View {
         List {
-            HStack {
-                Text("Values")
-                Spacer()
-                Text("Time")
+            VStack(alignment: .leading, spacing: 2) {
+                HStack {
+                    Text("Values")
+                    Spacer()
+                    Text("Time")
+                }
+                // Explain the fade once, and only when there are display-only readings
+                // (a native 1-min CGM); 5-min CGMs flag every reading, so nothing fades.
+                if glucoseStored.contains(where: { !$0.isAlgorithmReading }) {
+                    Text("Faded entries are display-only, not sent to the algorithm")
+                        .font(.caption2)
+                }
             }.foregroundStyle(.secondary)
 
             if !glucoseStored.isEmpty {
                 ForEach(glucoseStored) { glucose in
+                    // Readings the algorithm didn't use (extra readings from a native
+                    // 1-minute CGM) are display-only — faded so it's clear at a glance which
+                    // readings oref actually used. Manuals are always algorithm readings.
+                    let isDisplayOnly = !glucose.isAlgorithmReading
                     HStack {
                         Text(formatGlucose(Decimal(glucose.glucose), isManual: glucose.isManual))
 
@@ -43,6 +55,9 @@ extension History.RootView {
 
                         Text(Formatter.dateFormatter.string(from: glucose.date ?? Date()))
                     }
+                    // Display-only readings recede; the ~5-min readings oref uses stay at
+                    // full strength (consistent with the greyed dots on the home chart).
+                    .opacity(isDisplayOnly ? 0.55 : 1)
                     .contextMenu {
                         Button(
                             "Delete",
