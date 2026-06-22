@@ -297,13 +297,19 @@ final class BaseFetchGlucoseManager: FetchGlucoseManager, Injectable {
         }
         debug(.deviceManager, "New glucose found")
 
-        try await glucoseStorage.storeGlucose(filtered)
+        let didStoreAlgorithmReading = try await glucoseStorage.storeGlucose(filtered)
 
         if settingsManager.settings.smoothGlucose {
             await exponentialSmoothingGlucose(context: context)
         }
 
-        deviceDataManager.heartbeat(date: Date())
+        // Every reading is stored for display, but the loop keeps its ~5-min cadence:
+        // fire the heartbeat (which drives pump polling + the loop) only when a new
+        // algorithm reading was just stored, so a native 1-minute CGM doesn't poll the
+        // pump and loop every minute.
+        if didStoreAlgorithmReading {
+            deviceDataManager.heartbeat(date: Date())
+        }
 
         endBackgroundTaskSafely(&backgroundTaskID, taskName: "Glucose Store and Heartbeat Decision")
     }

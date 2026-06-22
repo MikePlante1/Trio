@@ -43,6 +43,21 @@ extension Home.StateModel {
 
     @MainActor private func updateGlucoseArray(with objects: [GlucoseStored]) {
         glucoseFromPersistence = objects
-        latestTwoGlucoseValues = Array(objects.suffix(2))
+
+        // The bobble shows the freshest (1-min) reading, but its delta should stay the
+        // conventional ~5-min change rather than a noisy 1-min delta now that every 1-min
+        // reading is stored. Pair the newest reading with the most recent reading at least
+        // ~5 min older. (Value mirrors GlucoseStorage's algorithmReadingInterval, inlined
+        // here as a display concept independent of the algorithm cadence.)
+        let fiveMinuteDeltaWindow: TimeInterval = 4.5 * 60
+        if let newest = objects.last, let newestDate = newest.date {
+            let previous = objects.dropLast().last(where: { older in
+                guard let olderDate = older.date else { return false }
+                return newestDate.timeIntervalSince(olderDate) >= fiveMinuteDeltaWindow
+            }) ?? objects.dropLast().last
+            latestTwoGlucoseValues = [previous, newest].compactMap { $0 }
+        } else {
+            latestTwoGlucoseValues = Array(objects.suffix(2))
+        }
     }
 }

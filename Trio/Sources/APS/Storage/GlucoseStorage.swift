@@ -9,7 +9,9 @@ import Swinject
 
 protocol GlucoseStorage {
     var updatePublisher: AnyPublisher<Void, Never> { get }
-    func storeGlucose(_ glucose: [BloodGlucose]) async throws
+    /// Stores new glucose. Returns `true` if at least one stored reading was flagged as an
+    /// algorithm reading (i.e. the loop should run for it).
+    @discardableResult func storeGlucose(_ glucose: [BloodGlucose]) async throws -> Bool
     func backfillGlucose(_ glucose: [BloodGlucose]) async throws
     func addManualGlucose(glucose: Int)
     func isGlucoseDataFresh(_ glucoseDate: Date?) -> Bool
@@ -41,7 +43,20 @@ final class BaseGlucoseStorage: GlucoseStorage, Injectable {
     }
 
     private enum Config {
+        /// Freshness window for `isGlucoseFresh()` — how recent the latest reading must be.
         static let filterTime: TimeInterval = 3.5 * 60
+        /// Minimum spacing between *stored* readings (dedup / anti-flood). Kept well under
+        /// 60s so a native 1-minute CGM (e.g. Libre 3) is stored at full resolution for
+        /// display. This used to share `filterTime` (3.5 min), which thinned 1-min data to
+        /// ~4 min.
+        static let minimumGlucoseInterval: TimeInterval = 30
+        /// Minimum spacing between readings flagged as *algorithm readings* (handed to oref
+        /// and used to drive the loop). A reading is flagged when it is at least this far
+        /// after the previous algorithm reading, so a native 1-minute CGM collapses to one
+        /// reading per ~5 min — the cadence oref, autosens and COB expect — while full 1-min
+        /// data is still stored for display. ~4.5 min tolerates CGM jitter; no-op for a true
+        /// 5-min CGM (every reading is flagged).
+        static let algorithmReadingInterval: TimeInterval = 4.5 * 60
         static let minimumGlucose: Int = 39
     }
 
@@ -74,7 +89,7 @@ final class BaseGlucoseStorage: GlucoseStorage, Injectable {
     ///  the most challenging and most rare since it would happen if wearing two devices and
     ///  switching or moving from direct glucose handling to xdrip. It's not worth the complexity
     ///  to deal with source switching perfectly, so instead we will backfill glucose if and only if
-    ///  it isn't within 3.5 minutes of an existing glucose reading, which is simple but not perfect.
+    ///  it isn't within `Config.minimumGlucoseInterval` of an existing glucose reading, which is simple but not perfect.
     ///  But since this is a corner case that really shouldn't happen often, it's good enough.
     func backfillGlucose(_ glucose: [BloodGlucose]) async throws {
         let clamped = clampToMinimum(glucose)
@@ -86,18 +101,23 @@ final class BaseGlucoseStorage: GlucoseStorage, Injectable {
                 timeBuffer: 1
             )
 
-            // check for a 3.5 minute difference between existing values
+            // drop backfilled values landing within the minimum-interval window of an
+            // existing reading (see Config.minimumGlucoseInterval)
             let filteredGlucose = self.filterGlucoseValues(
                 withoutDeletedGlucose,
                 fetchRequest: GlucoseStored.fetchRequest(),
-                timeBuffer: 3.5 * 60
+                timeBuffer: Config.minimumGlucoseInterval
             )
 
             guard !filteredGlucose.isEmpty else { return }
 
+            // Flag backfilled readings at ~5-min cadence relative to the last algorithm
+            // reading before the gap.
+            let algorithmDates = self.algorithmReadingDates(for: filteredGlucose)
+
             do {
                 // Store glucose values in Core Data
-                try self.storeGlucoseInCoreData(filteredGlucose)
+                try self.storeGlucoseInCoreData(filteredGlucose, algorithmDates: algorithmDates)
             } catch {
                 throw CoreDataError.creationError(
                     function: #function,
@@ -107,16 +127,19 @@ final class BaseGlucoseStorage: GlucoseStorage, Injectable {
         }
     }
 
-    func storeGlucose(_ glucose: [BloodGlucose]) async throws {
+    @discardableResult func storeGlucose(_ glucose: [BloodGlucose]) async throws -> Bool {
         let clamped = clampToMinimum(glucose)
-        try await context.perform {
+        return try await context.perform {
             // Get new glucose values that don't exist yet
             let newGlucose = self.filterGlucoseValues(clamped, fetchRequest: GlucoseStored.fetchRequest(), timeBuffer: 1)
-            guard !newGlucose.isEmpty else { return }
+            guard !newGlucose.isEmpty else { return false }
+
+            // Decide which of these readings the algorithm should consume (~5-min cadence)
+            let algorithmDates = self.algorithmReadingDates(for: newGlucose)
 
             do {
                 // Store glucose values in Core Data
-                try self.storeGlucoseInCoreData(newGlucose)
+                try self.storeGlucoseInCoreData(newGlucose, algorithmDates: algorithmDates)
             } catch {
                 throw CoreDataError.creationError(
                     function: #function,
@@ -126,6 +149,8 @@ final class BaseGlucoseStorage: GlucoseStorage, Injectable {
 
             // Store CGM state if needed
             self.storeCGMState(clamped)
+
+            return !algorithmDates.isEmpty
         }
     }
 
@@ -198,18 +223,50 @@ final class BaseGlucoseStorage: GlucoseStorage, Injectable {
         }
     }
 
-    private func storeGlucoseInCoreData(_ glucose: [BloodGlucose]) throws {
+    private func storeGlucoseInCoreData(_ glucose: [BloodGlucose], algorithmDates: Set<Date>) throws {
         if glucose.count > 1 {
-            try storeGlucoseBatch(glucose)
+            try storeGlucoseBatch(glucose, algorithmDates: algorithmDates)
         } else {
-            try storeGlucoseRegular(glucose)
+            try storeGlucoseRegular(glucose, algorithmDates: algorithmDates)
         }
     }
 
-    private func storeGlucoseRegular(_ glucose: [BloodGlucose]) throws {
+    /// Determines which of `newGlucose` should be flagged as algorithm readings (the ones
+    /// oref consumes and that drive the loop). A reading qualifies when it is at least
+    /// `Config.algorithmReadingInterval` after the previous algorithm reading, anchored to
+    /// the most recent algorithm reading already stored before this batch. A true 5-minute
+    /// CGM flags every reading; a 1-minute CGM flags ~every fifth. Must run on `context`.
+    private func algorithmReadingDates(for newGlucose: [BloodGlucose]) -> Set<Date> {
+        let sorted = newGlucose.sorted { $0.dateString < $1.dateString }
+        guard let earliest = sorted.first?.dateString else { return [] }
+
+        // Anchor to the last algorithm reading already stored before this batch.
+        let request = GlucoseStored.fetchRequest()
+        request.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [
+            NSPredicate(format: "isAlgorithmReading == YES"),
+            NSPredicate(format: "date < %@", earliest as NSDate)
+        ])
+        request.sortDescriptors = [NSSortDescriptor(keyPath: \GlucoseStored.date, ascending: false)]
+        request.fetchLimit = 1
+        request.propertiesToFetch = ["date"]
+
+        var lastAlgorithmDate = (try? context.fetch(request))?.first?.date ?? .distantPast
+
+        var algorithmDates = Set<Date>()
+        for entry in sorted {
+            let date = entry.dateString
+            if date.timeIntervalSince(lastAlgorithmDate) >= Config.algorithmReadingInterval {
+                algorithmDates.insert(date)
+                lastAlgorithmDate = date
+            }
+        }
+        return algorithmDates
+    }
+
+    private func storeGlucoseRegular(_ glucose: [BloodGlucose], algorithmDates: Set<Date>) throws {
         for entry in glucose {
             let glucoseEntry = GlucoseStored(context: context)
-            configureGlucoseEntry(glucoseEntry, with: entry)
+            configureGlucoseEntry(glucoseEntry, with: entry, isAlgorithmReading: algorithmDates.contains(entry.dateString))
         }
 
         guard context.hasChanges else { return }
@@ -217,7 +274,7 @@ final class BaseGlucoseStorage: GlucoseStorage, Injectable {
         updateSubject.send()
     }
 
-    private func storeGlucoseBatch(_ glucose: [BloodGlucose]) throws {
+    private func storeGlucoseBatch(_ glucose: [BloodGlucose], algorithmDates: Set<Date>) throws {
         var remainingGlucose = glucose
         let batchInsert = NSBatchInsertRequest(
             entity: GlucoseStored.entity(),
@@ -228,7 +285,11 @@ final class BaseGlucoseStorage: GlucoseStorage, Injectable {
                     return true
                 }
                 let entry = remainingGlucose.removeFirst()
-                self.configureGlucoseEntry(glucoseEntry, with: entry)
+                self.configureGlucoseEntry(
+                    glucoseEntry,
+                    with: entry,
+                    isAlgorithmReading: algorithmDates.contains(entry.dateString)
+                )
                 return false
             }
         )
@@ -236,11 +297,12 @@ final class BaseGlucoseStorage: GlucoseStorage, Injectable {
         updateSubject.send()
     }
 
-    private func configureGlucoseEntry(_ entry: GlucoseStored, with glucose: BloodGlucose) {
+    private func configureGlucoseEntry(_ entry: GlucoseStored, with glucose: BloodGlucose, isAlgorithmReading: Bool) {
         entry.id = UUID()
         entry.glucose = Int16(glucose.glucose ?? 0)
         entry.date = glucose.dateString
         entry.direction = glucose.direction?.rawValue
+        entry.isAlgorithmReading = isAlgorithmReading
         entry.isUploadedToNS = false
         entry.isUploadedToHealth = false
         entry.isUploadedToTidepool = false
@@ -320,6 +382,8 @@ final class BaseGlucoseStorage: GlucoseStorage, Injectable {
             newItem.date = Date()
             newItem.glucose = Int16(glucose)
             newItem.isManual = true
+            // Manual fingersticks are always handed to the algorithm.
+            newItem.isAlgorithmReading = true
             newItem.isUploadedToNS = false
             newItem.isUploadedToHealth = false
             newItem.isUploadedToTidepool = false
@@ -399,7 +463,7 @@ final class BaseGlucoseStorage: GlucoseStorage, Injectable {
         let sorted = glucose.sorted { $0.date < $1.date }
 
         for entry in sorted {
-            guard entry.dateString.addingTimeInterval(-Config.filterTime) > lastDate else {
+            guard entry.dateString.addingTimeInterval(-Config.minimumGlucoseInterval) > lastDate else {
                 continue
             }
             filtered.append(entry)

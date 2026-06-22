@@ -107,12 +107,20 @@ final class OpenAPS {
         // tracked meal absorption plus a small lead-in); Autosens uses the default
         // 24h because its sensitivity algorithm needs that full window.
         let cutoff = Date().addingTimeInterval(-(Double(truncating: fetchHours as NSNumber) * 3600))
-        let timePredicate = NSPredicate(format: "date >= %@", cutoff as NSDate)
+        // Only feed the algorithm the readings flagged as algorithm readings (~5-min
+        // cadence). A native 1-minute CGM stores extra display-only readings that must
+        // never reach oref, or the autosens/COB bucketers would collapse. This covers both
+        // the JS and Swift oref. Manual fingersticks are flagged, so they're included
+        // (cf. issue #1054). No-op for a true 5-min CGM (every reading is flagged).
+        let predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [
+            NSPredicate(format: "date >= %@", cutoff as NSDate),
+            NSPredicate(format: "isAlgorithmReading == YES")
+        ])
 
         let results = try await CoreDataStack.shared.fetchEntitiesAsync(
             ofType: GlucoseStored.self,
             onContext: context,
-            predicate: timePredicate,
+            predicate: predicate,
             key: "date",
             ascending: false,
             fetchLimit: fetchLimit,
