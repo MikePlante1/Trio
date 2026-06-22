@@ -37,7 +37,7 @@ struct GlucoseChartView: ChartContent {
             // oref actually used stand out, colored by range. Manual fingersticks are always
             // algorithm readings, so they keep the red drop.
             let isDisplayOnly = !item.isAlgorithmReading
-            let pointMarkColor: Color = isDisplayOnly ? Color.secondary.opacity(0.6) : rangeColor
+            let pointMarkColor: Color = isDisplayOnly ? rangeColor.opacity(0.6) : rangeColor
 
             PointMark(
                 x: .value("Time", item.date ?? Date(), unit: .second),
