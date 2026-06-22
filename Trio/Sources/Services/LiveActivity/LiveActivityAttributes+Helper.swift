@@ -37,8 +37,8 @@ extension LiveActivityAttributes.ContentState {
             .string(from: units == .mmolL ? value.asMmolL as NSNumber : NSNumber(value: value))!
     }
 
-    static func calculateChange(chart: [GlucoseData], units: GlucoseUnits) -> String {
-        guard chart.count > 2 else { return "" }
+    static func calculateChange(current: GlucoseData, previous: GlucoseData?, units: GlucoseUnits) -> String {
+        guard let previous else { return "" }
 
         let formatter = NumberFormatter()
         formatter.numberStyle = .decimal
@@ -46,8 +46,8 @@ extension LiveActivityAttributes.ContentState {
         formatter.positivePrefix = "  +"
         formatter.negativePrefix = "  -"
 
-        var lastGlucose = Decimal(chart.first?.glucose ?? 0)
-        var secondLastGlucose = Decimal(chart.dropFirst().first?.glucose ?? 0)
+        var lastGlucose = Decimal(current.glucose)
+        var secondLastGlucose = Decimal(previous.glucose)
         if units == .mmolL {
             lastGlucose = lastGlucose.asMmolL
             secondLastGlucose = secondLastGlucose.asMmolL
@@ -62,7 +62,7 @@ extension LiveActivityAttributes.ContentState {
 
     init(
         new bg: GlucoseData,
-        prev _: GlucoseData?,
+        prev prevGlucose: GlucoseData?,
         units: GlucoseUnits,
         chart: [GlucoseData],
         settings: TrioSettings,
@@ -100,7 +100,7 @@ extension LiveActivityAttributes.ContentState {
         }
 
         let trendString = bg.direction?.symbol as? String
-        let change = Self.calculateChange(chart: chart, units: units)
+        let change = Self.calculateChange(current: bg, previous: prevGlucose, units: units)
 
         let detailedState = LiveActivityAttributes.ContentAdditionalState(
             chart: chart.map { LiveActivityAttributes.ChartItem(value: Decimal($0.glucose), date: $0.date) },

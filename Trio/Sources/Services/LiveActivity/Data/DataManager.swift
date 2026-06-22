@@ -12,7 +12,10 @@ extension LiveActivityManager {
             predicate: NSPredicate.predicateForSixHoursAgo,
             key: "date",
             ascending: false,
-            fetchLimit: 72
+            // Native 1-min CGMs store ~6x more readings; fetch enough raw readings to still
+            // cover ~6h. Only the algorithm subset is plotted (see pushCurrentContent), so
+            // the chart payload stays small while the labels keep full 1-min resolution.
+            fetchLimit: 360
         )
 
         return try await context.perform {
@@ -21,7 +24,12 @@ extension LiveActivityManager {
             }
 
             return glucoseResults.map {
-                GlucoseData(glucose: Int($0.glucose), date: $0.date ?? Date(), direction: $0.directionEnum)
+                GlucoseData(
+                    glucose: Int($0.glucose),
+                    date: $0.date ?? Date(),
+                    direction: $0.directionEnum,
+                    isAlgorithmReading: $0.isAlgorithmReading
+                )
             }
         }
     }

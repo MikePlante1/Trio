@@ -404,7 +404,9 @@ final class LiveActivityData: ObservableObject {
             debug(.default, "[LiveActivityManager] pushCurrentContent: no current glucose data available")
             return
         }
-        let prevGlucose = data.glucoseFromPersistence?.dropFirst().first
+        // 5-min delta: pair the freshest reading with the most recent one ~5 min older,
+        // so the delta updates every minute (not every 5).
+        let prevGlucose = glucose.first(where: { bg.date.timeIntervalSince($0.date) >= 270 })
 
         guard let determination = data.determination else {
             debug(.default, "[LiveActivityManager] pushCurrentContent: no determination available")
@@ -415,7 +417,9 @@ final class LiveActivityData: ObservableObject {
             new: bg,
             prev: prevGlucose,
             units: settings.units,
-            chart: glucose,
+            // Plot only algorithm readings (~5-min) so a native 1-min CGM doesn't shrink
+            // the chart's time span; the labels above still use the 1-min readings.
+            chart: glucose.filter { $0.isAlgorithmReading },
             settings: settings,
             determination: determination,
             iob: data.iob,
