@@ -36,6 +36,7 @@ extension Home {
         @State var showCGMSelection: Bool = false
         @State var notificationsDisabled = false
         @State var timeButtons: [TimePicker] = [
+            TimePicker(active: false, hours: 2),
             TimePicker(active: false, hours: 4),
             TimePicker(active: false, hours: 6),
             TimePicker(active: false, hours: 12),
