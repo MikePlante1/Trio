@@ -23,7 +23,7 @@ struct ForecastChart: View {
     private var selectedGlucose: GlucoseStored? {
         guard let selection = selection else { return nil }
         let range = selection.addingTimeInterval(-150) ... selection.addingTimeInterval(150)
-        return state.glucoseFromPersistence.first { $0.date.map(range.contains) ?? false }
+        return state.glucoseFromPersistence.first { !$0.isDisplayOnly && ($0.date.map(range.contains) ?? false) }
     }
 
     var body: some View {
@@ -114,7 +114,7 @@ struct ForecastChart: View {
     }
 
     private var maxGlucoseMgDl: Decimal {
-        let maxGlucose = state.glucoseFromPersistence.map({ Decimal($0.glucose) }).max() ?? 300
+        let maxGlucose = state.glucoseFromPersistence.filter({ !$0.isDisplayOnly }).map({ Decimal($0.glucose) }).max() ?? 300
         return maxGlucose > 300 ? 400 : 300
     }
 
@@ -252,7 +252,7 @@ struct ForecastChart: View {
     }
 
     private func drawGlucose() -> some ChartContent {
-        ForEach(state.glucoseFromPersistence) { item in
+        ForEach(state.glucoseFromPersistence.filter { !$0.isDisplayOnly }) { item in
             let glucoseToDisplay = state.units == .mgdL ? Decimal(item.glucose) : Decimal(item.glucose).asMmolL
             let targetGlucose = (state.determination.first?.currentTarget ?? state.currentBGTarget as NSDecimalNumber) as Decimal
 
