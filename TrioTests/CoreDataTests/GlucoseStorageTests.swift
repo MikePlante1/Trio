@@ -127,6 +127,49 @@ import Testing
         #expect(notUploadedEntries[0].glucose == 160, "Glucose value should match")
     }
 
+    @Test("Display-only readings are excluded from every upload queue") func testDisplayOnlyExcludedFromUploads() async throws {
+        // Given an algorithm reading (uploadable) and a display-only reading (not), neither uploaded yet
+        try await testContext.perform {
+            let algorithmReading = GlucoseStored(context: self.testContext)
+            algorithmReading.id = UUID()
+            algorithmReading.date = Date()
+            algorithmReading.glucose = 100
+            algorithmReading.isManual = false
+            algorithmReading.isDisplayOnly = false
+            algorithmReading.isUploadedToNS = false
+            algorithmReading.isUploadedToHealth = false
+            algorithmReading.isUploadedToTidepool = false
+
+            let displayOnlyReading = GlucoseStored(context: self.testContext)
+            displayOnlyReading.id = UUID()
+            displayOnlyReading.date = Date().addingTimeInterval(-60)
+            displayOnlyReading.glucose = 200
+            displayOnlyReading.isManual = false
+            displayOnlyReading.isDisplayOnly = true
+            displayOnlyReading.isUploadedToNS = false
+            displayOnlyReading.isUploadedToHealth = false
+            displayOnlyReading.isUploadedToTidepool = false
+
+            try self.testContext.save()
+        }
+
+        // When
+        let nsEntries = try await storage.getGlucoseNotYetUploadedToNightscout()
+        let healthEntries = try await storage.getGlucoseNotYetUploadedToHealth()
+        let tidepoolEntries = try await storage.getGlucoseNotYetUploadedToTidepool()
+
+        // Then only the algorithm reading (100) is queued; the display-only reading (200) is excluded everywhere
+        #expect(nsEntries.count == 1, "Only the algorithm reading should be queued for Nightscout")
+        #expect(nsEntries.first?.glucose == 100)
+        #expect(nsEntries.allSatisfy { $0.glucose != 200 }, "Display-only reading must not upload to Nightscout")
+
+        #expect(healthEntries.count == 1, "Only the algorithm reading should be queued for Health")
+        #expect(healthEntries.first?.glucose == 100)
+        #expect(healthEntries.allSatisfy { $0.glucose != 200 }, "Display-only reading must not upload to Health")
+
+        #expect(tidepoolEntries.count == 1, "Only the algorithm reading should be queued for Tidepool")
+    }
+
     @Test("Sub-39 glucose is clamped to 39 on storeGlucose") func testStoreGlucoseClampsBelowMinimum() async throws {
         // Given a CGM reading below the 39 mg/dL floor (e.g. LibreTransmitter delivering 23)
         let testGlucose = [

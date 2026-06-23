@@ -78,19 +78,36 @@ extension NSPredicate {
         return NSPredicate(format: "date >= %@", date as NSDate)
     }
 
+    // Display-only readings (e.g. a 1-min CGM's extras between its ~5-min algorithm
+    // readings) are stored and charted locally but never uploaded to remote services.
     static var glucoseNotYetUploadedToNightscout: NSPredicate {
         let date = Date.oneDayAgo
-        return NSPredicate(format: "date >= %@ AND isUploadedToNS == %@", date as NSDate, false as NSNumber)
+        return NSPredicate(
+            format: "date >= %@ AND isUploadedToNS == %@ AND isDisplayOnly == %@",
+            date as NSDate,
+            false as NSNumber,
+            false as NSNumber
+        )
     }
 
     static var glucoseNotYetUploadedToHealth: NSPredicate {
         let date = Date.oneDayAgo
-        return NSPredicate(format: "date >= %@ AND isUploadedToHealth == %@", date as NSDate, false as NSNumber)
+        return NSPredicate(
+            format: "date >= %@ AND isUploadedToHealth == %@ AND isDisplayOnly == %@",
+            date as NSDate,
+            false as NSNumber,
+            false as NSNumber
+        )
     }
 
     static var glucoseNotYetUploadedToTidepool: NSPredicate {
         let date = Date.oneDayAgo
-        return NSPredicate(format: "date >= %@ AND isUploadedToTidepool == %@", date as NSDate, false as NSNumber)
+        return NSPredicate(
+            format: "date >= %@ AND isUploadedToTidepool == %@ AND isDisplayOnly == %@",
+            date as NSDate,
+            false as NSNumber,
+            false as NSNumber
+        )
     }
 
     static var manualGlucoseNotYetUploadedToHealth: NSPredicate {
