@@ -40,7 +40,7 @@ struct MainChartView: View {
     private var selectedGlucose: GlucoseStored? {
         guard let selection = selection else { return nil }
         let range = selection.addingTimeInterval(-150) ... selection.addingTimeInterval(150)
-        return state.glucoseFromPersistence.first { $0.date.map(range.contains) ?? false }
+        return state.glucoseFromPersistence.first { !$0.isDisplayOnly && ($0.date.map(range.contains) ?? false) }
     }
 
     private func findDetermination(in range: ClosedRange<Date>) -> OrefDetermination? {
