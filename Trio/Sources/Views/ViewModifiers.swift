@@ -1,5 +1,6 @@
 import Combine
 import SwiftUI
+import UIKit
 
 struct RoundedBackground: ViewModifier {
     private let color: Color
@@ -168,4 +169,73 @@ extension View {
 
 struct Backport<Content: View> {
     let content: Content
+}
+
+// Presents a UIKit controller as a real modal instead of SwiftUI `.sheet` content: under the
+// Home screen's GeometryReader, iOS 26 drops a sheet-hosted coordinator's `.navigationTitle`;
+// a real modal keeps it. Used for LoopKit pump/CGM coordinators.
+extension View {
+    func uiKitModal(
+        isPresented: Binding<Bool>,
+        makeViewController: @escaping () -> UIViewController?
+    ) -> some View {
+        background(UIKitModalPresenter(isPresented: isPresented, makeViewController: makeViewController))
+    }
+}
+
+// Presents from the key window's topmost controller, not from this host, so the modal is
+// unaffected by the GeometryReader/SwiftUI hierarchy it lives in.
+private struct UIKitModalPresenter: UIViewControllerRepresentable {
+    @Binding var isPresented: Bool
+    let makeViewController: () -> UIViewController?
+
+    func makeCoordinator() -> Coordinator { Coordinator(isPresented: $isPresented) }
+
+    func makeUIViewController(context _: Context) -> UIViewController { UIViewController() }
+
+    func updateUIViewController(_: UIViewController, context: Context) {
+        let coordinator = context.coordinator
+
+        if isPresented {
+            guard coordinator.presented == nil, let viewController = makeViewController() else { return }
+            coordinator.presented = viewController
+            DispatchQueue.main.async {
+                guard self.isPresented,
+                      viewController.presentingViewController == nil,
+                      let presenter = UIApplication.shared.topmostViewController
+                else { return }
+                presenter.present(viewController, animated: true) {
+                    viewController.presentationController?.delegate = coordinator
+                }
+            }
+        } else if let presented = coordinator.presented {
+            coordinator.presented = nil
+            presented.dismiss(animated: true)
+        }
+    }
+
+    final class Coordinator: NSObject, UIAdaptivePresentationControllerDelegate {
+        private let isPresented: Binding<Bool>
+        var presented: UIViewController?
+
+        init(isPresented: Binding<Bool>) { self.isPresented = isPresented }
+
+        // Sync state when the user swipes the modal away.
+        func presentationControllerDidDismiss(_: UIPresentationController) {
+            presented = nil
+            if isPresented.wrappedValue { isPresented.wrappedValue = false }
+        }
+    }
+}
+
+extension UIApplication {
+    var topmostViewController: UIViewController? {
+        let keyWindow = connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap(\.windows)
+            .first { $0.isKeyWindow }
+        var top = keyWindow?.rootViewController
+        while let presented = top?.presentedViewController { top = presented }
+        return top
+    }
 }

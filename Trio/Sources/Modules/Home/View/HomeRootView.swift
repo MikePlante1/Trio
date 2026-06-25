@@ -999,16 +999,16 @@ extension Home {
                 Button("Medtrum Nano") { state.addPump(.medtrum) }
                 Button("Pump Simulator") { state.addPump(.simulator) }
             } message: { Text("Select Pump Model") }
-            .sheet(isPresented: $state.shouldDisplayPumpSetupSheet) {
+            .uiKitModal(isPresented: $state.shouldDisplayPumpSetupSheet) {
                 if let pumpManager = state.provider.apsManager.pumpManager {
-                    PumpConfig.PumpSettingsView(
+                    return PumpConfig.PumpSettingsView.makeController(
                         pumpManager: pumpManager,
                         bluetoothManager: state.provider.apsManager.bluetoothManager!,
                         completionDelegate: state,
                         setupDelegate: state
                     )
                 } else {
-                    PumpConfig.PumpSetupView(
+                    return PumpConfig.PumpSetupView.makeController(
                         pumpType: state.setupPumpType,
                         pumpInitialSettings: state.pumpInitialSettings,
                         bluetoothManager: state.provider.apsManager.bluetoothManager!,

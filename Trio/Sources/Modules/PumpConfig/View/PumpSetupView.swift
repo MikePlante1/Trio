@@ -19,6 +19,24 @@ extension PumpConfig {
         weak var setupDelegate: PumpManagerOnboardingDelegate?
 
         func makeUIViewController(context _: UIViewControllerRepresentableContext<PumpSetupView>) -> UIViewController {
+            Self.makeController(
+                pumpType: pumpType,
+                pumpInitialSettings: pumpInitialSettings,
+                bluetoothManager: bluetoothManager,
+                completionDelegate: completionDelegate,
+                setupDelegate: setupDelegate
+            )
+        }
+
+        /// Builds the pump setup/onboarding controller. Shared by the SwiftUI representable
+        /// (Settings path) and the UIKit-modal presentation on the Home screen.
+        static func makeController(
+            pumpType: PumpType,
+            pumpInitialSettings: PumpInitialSettings,
+            bluetoothManager: BluetoothStateManager,
+            completionDelegate: CompletionDelegate?,
+            setupDelegate: PumpManagerOnboardingDelegate?
+        ) -> UIViewController {
             // var setupViewController: PumpManagerSetupViewController & UIViewController & CompletionNotifying
             var setupViewController: SetupUIResult<
                 PumpManagerViewController,
