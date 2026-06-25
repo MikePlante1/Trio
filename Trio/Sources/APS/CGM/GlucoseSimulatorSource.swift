@@ -13,6 +13,7 @@
 ///  - OscillatingGenerator: BloodGlucoseGenerator - Generates sinusoidal glucose values around a center point
 
 import Combine
+import CoreData
 import Foundation
 import LoopKit
 import LoopKitUI
@@ -70,10 +71,40 @@ final class GlucoseSimulatorSource: GlucoseSource {
         }
     }
 
-    /// Picker entry point — change scenario + propagate immediately.
+    /// Picker entry point — change scenario + propagate immediately. When
+    /// flipping to a state where a real sensor wouldn't be delivering fresh
+    /// readings, drop any GlucoseStored rows inside the home view's 12 min
+    /// freshness window so the bobble switches to its compact stale view
+    /// right away instead of waiting for organic aging.
     func applySimulatedScenario(_ scenario: SimulatedSensorScenario) {
         simulatedScenario = scenario
+        if !scenario.deliversFreshGlucose {
+            clearRecentSimulatorReadings()
+        }
         publishSimulatedState()
+    }
+
+    /// Deletes GlucoseStored rows newer than the home view's 12 min
+    /// freshness window. Dev-only — only invoked from the simulator's
+    /// scenario picker, which is itself gated to simulator mode.
+    private func clearRecentSimulatorReadings() {
+        let context = CoreDataStack.shared.newTaskContext()
+        let cutoff = Date().addingTimeInterval(-12 * 60)
+        context.perform {
+            let request = GlucoseStored.fetchRequest()
+            request.predicate = NSPredicate(format: "date > %@", cutoff as NSDate)
+            do {
+                let recent = try context.fetch(request)
+                for row in recent {
+                    context.delete(row)
+                }
+                if context.hasChanges {
+                    try context.save()
+                }
+            } catch {
+                print("GlucoseSimulatorSource: clearRecentSimulatorReadings failed: \(error)")
+            }
+        }
     }
 
     /// The glucose generator used to create simulated values
@@ -97,6 +128,14 @@ final class GlucoseSimulatorSource: GlucoseSource {
     /// - Returns: A publisher that emits an array of BloodGlucose objects
     func fetch(_: DispatchTimer?) -> AnyPublisher<[BloodGlucose], Never> {
         guard canGenerateNewValues else {
+            return Just([]).eraseToAnyPublisher()
+        }
+        // Match real CGM behavior: scenarios where a physical sensor wouldn't
+        // be delivering readings (warmup, calibration, expired, failed) also
+        // stop the simulator from emitting fresh values. Existing readings
+        // then age out of the 12 min freshness window, the bobble flips to
+        // its compact symbol view, and the highlight's imageName surfaces.
+        guard simulatedScenario.deliversFreshGlucose else {
             return Just([]).eraseToAnyPublisher()
         }
 
@@ -234,6 +273,23 @@ enum SimulatedSensorScenario: String, CaseIterable, Identifiable {
         case .calibrationRequired: return "Calibration required"
         case .expired: return "Expired"
         case .sensorFailed: return "Sensor failed"
+        }
+    }
+
+    /// Whether a real CGM would still be delivering fresh glucose readings
+    /// while in this state. Drives the simulator's `fetch()` gate so non-
+    /// active scenarios stop emitting and the home view sees stale data
+    /// the same way it would from a real sensor.
+    var deliversFreshGlucose: Bool {
+        switch self {
+        case .expiringSoon,
+             .runningNormally:
+            return true
+        case .calibrationRequired,
+             .expired,
+             .sensorFailed,
+             .warmup:
+            return false
         }
     }
 

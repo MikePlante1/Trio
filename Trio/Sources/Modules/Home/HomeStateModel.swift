@@ -333,11 +333,26 @@ extension Home {
                     self.timerDate = Date()
                     // The publisher only re-emits on state changes; re-pull
                     // so the arc + countdowns + status text advance during
-                    // warmup / stabilizing / expiry.
+                    // warmup / stabilizing / expiry. Simulator has no
+                    // CGMManager, so fall back to reading its synthetic
+                    // lifecycle / highlight so the bobble sees the same
+                    // data shape a real CGM would deliver.
                     let manager = self.fetchGlucoseManager.cgmManager
-                    let progress = manager?.cgmLifecycleProgress
+                    let source = self.fetchGlucoseManager.glucoseSource
+                    let progress: DeviceLifecycleProgress?
+                    let highlight: DeviceStatusHighlight?
+                    if let manager {
+                        progress = manager.cgmLifecycleProgress
+                        highlight = manager.cgmStatusHighlight
+                    } else if let sim = source as? GlucoseSimulatorSource {
+                        progress = sim.cgmLifecycleProgress
+                        highlight = sim.cgmStatusHighlight
+                    } else {
+                        progress = nil
+                        highlight = nil
+                    }
                     self.cgmProgressHighlight = progress
-                    if let highlight = manager?.cgmStatusHighlight {
+                    if let highlight {
                         self.cgmDisplayState = CgmDisplayState(
                             localizedMessage: highlight.localizedMessage,
                             imageName: highlight.imageName,
@@ -348,7 +363,7 @@ extension Home {
                     }
                     self.cgmSensorExpiresAt = Self.resolveSensorExpiresAt(
                         manager: manager,
-                        glucoseSource: self.fetchGlucoseManager.glucoseSource,
+                        glucoseSource: source,
                         lifecycle: progress
                     )
                     self.cgmWarmupEndsAt = Self.resolveWarmupEndsAt(manager: manager)
@@ -705,7 +720,16 @@ extension Home {
                 return sim.simulatedSensorExpiresAt
             }
             guard let manager else { return nil }
-            if let g7 = manager as? G7CGMManager, let exp = g7.sensorExpiresAt { return exp }
+            // Once a G7 enters grace period, `sensorExpiresAt` is in the past
+            // and would collapse the bobble countdown to "<1m" while the arc
+            // (driven by lifecycle.percentComplete against `sensorEndsAt`) is
+            // still mid-progress. Fall back to `sensorEndsAt` so bobble and
+            // arc agree, and the user sees grace-period time remaining.
+            if let g7 = manager as? G7CGMManager {
+                let now = Date()
+                if let exp = g7.sensorExpiresAt, exp > now { return exp }
+                return g7.sensorEndsAt ?? g7.sensorExpiresAt
+            }
             if let g6 = manager as? G6CGMManager, let exp = g6.latestReading?.sessionExpDate { return exp }
             if let g5 = manager as? G5CGMManager, let exp = g5.latestReading?.sessionExpDate { return exp }
 
