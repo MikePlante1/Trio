@@ -457,7 +457,7 @@ final class BaseGarminManager: NSObject, GarminManager, Injectable {
         let results = try await CoreDataStack.shared.fetchEntitiesAsync(
             ofType: GlucoseStored.self,
             onContext: backgroundContext,
-            predicate: NSPredicate.glucose,
+            predicate: NSPredicate.algorithmGlucose,
             key: "date",
             ascending: false,
             fetchLimit: limit

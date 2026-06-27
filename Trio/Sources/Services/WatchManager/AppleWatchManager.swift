@@ -377,7 +377,7 @@ final class BaseWatchManager: NSObject, WCSessionDelegate, Injectable, WatchMana
         let results = try await CoreDataStack.shared.fetchEntitiesAsync(
             ofType: GlucoseStored.self,
             onContext: backgroundContext,
-            predicate: NSPredicate.glucose,
+            predicate: NSPredicate.algorithmGlucose,
             key: "date",
             ascending: false,
             fetchLimit: 288

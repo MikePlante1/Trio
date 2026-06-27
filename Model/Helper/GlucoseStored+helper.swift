@@ -48,6 +48,16 @@ extension NSPredicate {
         return NSPredicate(format: "date >= %@", date as NSDate)
     }
 
+    /// Like `glucose`, but only algorithm readings (`isDisplayOnly == NO`). Use on
+    /// space-constrained surfaces (Apple Watch) that want a ~5-min cadence: a native
+    /// 1-minute CGM stores ~6x more rows, so an unfiltered "most recent N" both shrinks
+    /// the time window and plots 1-min display-only dots. Filtering keeps N ≈ 24h and a
+    /// consecutive-pair delta at ~5 min, matching the phone/Live-Activity behavior.
+    static var algorithmGlucose: NSPredicate {
+        let date = Date.oneDayAgo
+        return NSPredicate(format: "date >= %@ AND isDisplayOnly == NO", date as NSDate)
+    }
+
     static var manualGlucose: NSPredicate {
         let date = Date.oneDayAgo
         return NSPredicate(format: "isManual == %@ AND date >= %@", true as NSNumber, date as NSDate)
