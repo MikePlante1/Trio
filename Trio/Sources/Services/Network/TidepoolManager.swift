@@ -972,3 +972,19 @@ extension Service {
         ]
     }
 }
+
+// MARK: - Upload serialization
+
+/// Runs enqueued async work strictly in order: each operation starts only after the previous one
+/// has fully completed, including its network round-trip.
+actor TidepoolUploadSerializer {
+    private var tail: Task<Void, Never>?
+
+    func enqueue(_ operation: @escaping () async -> Void) {
+        let previous = tail
+        tail = Task {
+            await previous?.value
+            await operation()
+        }
+    }
+}
