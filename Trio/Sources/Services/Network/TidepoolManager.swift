@@ -37,6 +37,10 @@ final class BaseTidepoolManager: TidepoolManager, Injectable {
 
     private let processQueue = DispatchQueue(label: "BaseNetworkManager.processQueue")
 
+    /// Serializes uploads so only one request is in flight at a time. Concurrent uploads can each
+    /// trigger a session refresh that reuses the single-use refresh token, corrupting the session.
+    private let uploadSerializer = TidepoolUploadSerializer()
+
     /// Pending debounce work item for settings upload; cancelled and rescheduled
     /// each time an observer fires, so rapid changes coalesce into one upload.
     /// - Important: Only access from `processQueue` to ensure thread safety.
@@ -214,32 +218,33 @@ extension BaseTidepoolManager: ServiceDelegate {
 extension BaseTidepoolManager {
     func uploadCarbs() async {
         do {
-            try uploadCarbs(await carbsStorage.getCarbsNotYetUploadedToTidepool())
+            await uploadCarbs(try await carbsStorage.getCarbsNotYetUploadedToTidepool())
         } catch {
             debug(.service, "\(DebuggingIdentifiers.failed) Failed to upload carbs with error: \(error)")
         }
     }
 
-    func uploadCarbs(_ carbs: [CarbsEntry]) {
+    func uploadCarbs(_ carbs: [CarbsEntry]) async {
         guard !carbs.isEmpty, let tidepoolService = self.tidepoolService else { return }
+        debug(.service, "Tidepool: carbs upload triggered (\(carbs.count) pending)")
 
-        processQueue.async {
-            carbs.chunks(ofCount: tidepoolService.carbDataLimit ?? 100).forEach { chunk in
+        await uploadSerializer.enqueue { [weak self] in
+            guard let self = self else { return }
 
-                let syncCarb: [SyncCarbObject] = Array(chunk).map {
-                    $0.convertSyncCarb()
+            for chunk in carbs.chunks(ofCount: tidepoolService.carbDataLimit ?? 100) {
+                let syncCarb: [SyncCarbObject] = Array(chunk).map { $0.convertSyncCarb() }
+
+                let result = await self.awaitUpload("carbs") { completion in
+                    tidepoolService.uploadCarbData(created: syncCarb, updated: [], deleted: [], completion: completion)
                 }
-                tidepoolService.uploadCarbData(created: syncCarb, updated: [], deleted: []) { result in
-                    switch result {
-                    case let .failure(error):
-                        debug(.nightscout, "Error synchronizing carbs data with Tidepool: \(String(describing: error))")
-                    case .success:
-                        debug(.nightscout, "Success synchronizing carbs data. Upload to Tidepool complete.")
-                        // After successful upload, update the isUploadedToTidepool flag in Core Data
-                        Task {
-                            await self.updateCarbsAsUploaded(carbs)
-                        }
-                    }
+
+                switch result {
+                case .success:
+                    debug(.service, "Success synchronizing carbs data. Upload to Tidepool complete.")
+                    // After successful upload, update the isUploadedToTidepool flag in Core Data
+                    await self.updateCarbsAsUploaded(carbs)
+                case let .failure(error):
+                    debug(.service, "Error synchronizing carbs data with Tidepool: \(String(describing: error))")
                 }
             }
         }
@@ -270,31 +275,35 @@ extension BaseTidepoolManager {
     func deleteCarbs(withSyncId id: UUID, carbs: Decimal, at: Date, enteredBy: String) {
         guard let tidepoolService = self.tidepoolService else { return }
 
-        processQueue.async {
-            let syncCarb: [SyncCarbObject] = [SyncCarbObject(
-                absorptionTime: nil,
-                createdByCurrentApp: true,
-                foodType: nil,
-                grams: Double(carbs),
-                startDate: at,
-                uuid: id,
-                provenanceIdentifier: enteredBy,
-                syncIdentifier: id.uuidString,
-                syncVersion: nil,
-                userCreatedDate: nil,
-                userUpdatedDate: nil,
-                userDeletedDate: nil,
-                operation: LoopKit.Operation.delete,
-                addedDate: nil,
-                supercededDate: nil
-            )]
+        let syncCarb: [SyncCarbObject] = [SyncCarbObject(
+            absorptionTime: nil,
+            createdByCurrentApp: true,
+            foodType: nil,
+            grams: Double(carbs),
+            startDate: at,
+            uuid: id,
+            provenanceIdentifier: enteredBy,
+            syncIdentifier: id.uuidString,
+            syncVersion: nil,
+            userCreatedDate: nil,
+            userUpdatedDate: nil,
+            userDeletedDate: nil,
+            operation: LoopKit.Operation.delete,
+            addedDate: nil,
+            supercededDate: nil
+        )]
 
-            tidepoolService.uploadCarbData(created: [], updated: [], deleted: syncCarb) { result in
+        Task { [weak self] in
+            await self?.uploadSerializer.enqueue { [weak self] in
+                guard let self = self else { return }
+                let result = await self.awaitUpload("carbs-delete") { completion in
+                    tidepoolService.uploadCarbData(created: [], updated: [], deleted: syncCarb, completion: completion)
+                }
                 switch result {
-                case let .failure(error):
-                    debug(.nightscout, "Error synchronizing carbs data with Tidepool: \(String(describing: error))")
                 case .success:
-                    debug(.nightscout, "Success synchronizing carbs data. Upload to Tidepool complete.")
+                    debug(.service, "Success synchronizing carbs delete data. Upload to Tidepool complete.")
+                case let .failure(error):
+                    debug(.service, "Error synchronizing carbs delete data with Tidepool: \(String(describing: error))")
                 }
             }
         }
@@ -314,6 +323,7 @@ extension BaseTidepoolManager {
 
     func uploadDose(_ events: [PumpHistoryEvent]) async {
         guard !events.isEmpty, let tidepoolService = self.tidepoolService else { return }
+        debug(.service, "Tidepool: dose upload triggered (\(events.count) pending)")
 
         do {
             // Fetch all temp basal entries from Core Data for the last 24 hours
@@ -322,108 +332,110 @@ extension BaseTidepoolManager {
                 onContext: backgroundContext,
                 predicate: NSCompoundPredicate(andPredicateWithSubpredicates: [
                     NSPredicate.pumpHistoryLast24h,
-                    NSPredicate(format: "tempBasal != nil")
+                    NSPredicate(format: "tempBasal != nil"),
                 ]),
                 key: "timestamp",
                 ascending: true,
                 batchSize: 50
             )
 
-            // Ensure that the processing happens within the background context for thread safety
-            try await backgroundContext.perform {
-                guard let existingTempBasalEntries = results as? [PumpEventStored] else {
-                    throw CoreDataError.fetchError(function: #function, file: #file)
-                }
+            // Build the upload payloads in the background context, then upload off the queue.
+            let (insulinDoseEvents, pumpEvents): ([DoseEntry], [PersistedPumpEvent]) = try await backgroundContext
+                .perform {
+                    guard let existingTempBasalEntries = results as? [PumpEventStored] else {
+                        throw CoreDataError.fetchError(function: #function, file: #file)
+                    }
 
-                let insulinDoseEvents: [DoseEntry] = events.reduce([]) { result, event in
-                    var result = result
-                    switch event.type {
-                    case .tempBasal:
-                        result
-                            .append(
-                                contentsOf: self
-                                    .processTempBasalEvent(event, existingTempBasalEntries: existingTempBasalEntries)
+                    let insulinDoseEvents: [DoseEntry] = events.reduce([]) { result, event in
+                        var result = result
+                        switch event.type {
+                        case .tempBasal:
+                            result
+                                .append(
+                                    contentsOf: self
+                                        .processTempBasalEvent(event, existingTempBasalEntries: existingTempBasalEntries)
+                                )
+                        case .bolus:
+                            guard let amount = event.amount else { return result }
+                            let bolusDoseEntry = DoseEntry(
+                                type: .bolus,
+                                startDate: event.timestamp,
+                                endDate: event.timestamp,
+                                value: Double(amount),
+                                unit: .units,
+                                deliveredUnits: nil,
+                                syncIdentifier: event.id,
+                                scheduledBasalRate: nil,
+                                insulinType: self.apsManager.pumpManager?.status.insulinType ?? nil,
+                                automatic: event.isSMB ?? true,
+                                manuallyEntered: event.isExternal ?? false
                             )
-                    case .bolus:
-                        guard let amount = event.amount else { return result }
-                        let bolusDoseEntry = DoseEntry(
-                            type: .bolus,
-                            startDate: event.timestamp,
-                            endDate: event.timestamp,
-                            value: Double(amount),
-                            unit: .units,
-                            deliveredUnits: nil,
-                            syncIdentifier: event.id,
-                            scheduledBasalRate: nil,
-                            insulinType: self.apsManager.pumpManager?.status.insulinType ?? nil,
-                            automatic: event.isSMB ?? true,
-                            manuallyEntered: event.isExternal ?? false
-                        )
-                        result.append(bolusDoseEntry)
-                    default:
-                        break
-                    }
-                    return result
-                }
-
-                debug(.service, "TIDEPOOL DOSE ENTRIES: \(insulinDoseEvents)")
-
-                let pumpEvents: [PersistedPumpEvent] = events.compactMap { event -> PersistedPumpEvent? in
-                    if let pumpEventType = event.type.mapEventTypeToPumpEventType() {
-                        let dose: DoseEntry? = switch pumpEventType {
-                        case .suspend:
-                            DoseEntry(suspendDate: event.timestamp, automatic: true)
-                        case .resume:
-                            DoseEntry(resumeDate: event.timestamp, automatic: true)
+                            result.append(bolusDoseEntry)
                         default:
-                            nil
+                            break
                         }
-
-                        return PersistedPumpEvent(
-                            date: event.timestamp,
-                            persistedDate: event.timestamp,
-                            dose: dose,
-                            isUploaded: true,
-                            objectIDURL: URL(string: "x-coredata:///PumpEvent/\(event.id)")!,
-                            raw: event.id.data(using: .utf8),
-                            title: event.note,
-                            type: pumpEventType
-                        )
-                    } else {
-                        return nil
+                        return result
                     }
+
+                    debug(.service, "TIDEPOOL DOSE ENTRIES: \(insulinDoseEvents)")
+
+                    let pumpEvents: [PersistedPumpEvent] = events.compactMap { event -> PersistedPumpEvent? in
+                        if let pumpEventType = event.type.mapEventTypeToPumpEventType() {
+                            let dose: DoseEntry? = switch pumpEventType {
+                            case .suspend:
+                                DoseEntry(suspendDate: event.timestamp, automatic: true)
+                            case .resume:
+                                DoseEntry(resumeDate: event.timestamp, automatic: true)
+                            default:
+                                nil
+                            }
+
+                            return PersistedPumpEvent(
+                                date: event.timestamp,
+                                persistedDate: event.timestamp,
+                                dose: dose,
+                                isUploaded: true,
+                                objectIDURL: URL(string: "x-coredata:///PumpEvent/\(event.id)")!,
+                                raw: event.id.data(using: .utf8),
+                                title: event.note,
+                                type: pumpEventType
+                            )
+                        } else {
+                            return nil
+                        }
+                    }
+
+                    return (insulinDoseEvents, pumpEvents)
                 }
 
-                self.processQueue.async {
-                    tidepoolService.uploadDoseData(created: insulinDoseEvents, deleted: []) { result in
-                        switch result {
-                        case let .failure(error):
-                            debug(.nightscout, "Error synchronizing dose data with Tidepool: \(String(describing: error))")
-                        case .success:
-                            debug(.nightscout, "Success synchronizing dose data. Upload to Tidepool complete.")
-                            Task {
-                                let insulinEvents = events.filter {
-                                    $0.type == .tempBasal || $0.type == .tempBasalDuration || $0.type == .bolus
-                                }
-                                await self.updateInsulinAsUploaded(insulinEvents)
-                            }
-                        }
-                    }
+            await uploadSerializer.enqueue { [weak self] in
+                guard let self = self else { return }
 
-                    tidepoolService.uploadPumpEventData(pumpEvents) { result in
-                        switch result {
-                        case let .failure(error):
-                            debug(.nightscout, "Error synchronizing pump events data: \(String(describing: error))")
-                        case .success:
-                            debug(.nightscout, "Success synchronizing pump events data. Upload to Tidepool complete.")
-                            Task {
-                                let pumpEventType = events.map { $0.type.mapEventTypeToPumpEventType() }
-                                let pumpEvents = events.filter { _ in pumpEventType.contains(pumpEventType) }
-
-                                await self.updateInsulinAsUploaded(pumpEvents)
-                            }
-                        }
+                let doseResult = await self.awaitUpload("dose") { completion in
+                    tidepoolService.uploadDoseData(created: insulinDoseEvents, deleted: [], completion: completion)
+                }
+                switch doseResult {
+                case .success:
+                    debug(.service, "Success synchronizing dose data. Upload to Tidepool complete.")
+                    let insulinEvents = events.filter {
+                        $0.type == .tempBasal || $0.type == .tempBasalDuration || $0.type == .bolus
                     }
+                    await self.updateInsulinAsUploaded(insulinEvents)
+                case let .failure(error):
+                    debug(.service, "Error synchronizing dose data with Tidepool: \(String(describing: error))")
+                }
+
+                let pumpResult = await self.awaitUpload("pumpEvents") { completion in
+                    tidepoolService.uploadPumpEventData(pumpEvents, completion: completion)
+                }
+                switch pumpResult {
+                case .success:
+                    debug(.service, "Success synchronizing pump events data. Upload to Tidepool complete.")
+                    let pumpEventType = events.map { $0.type.mapEventTypeToPumpEventType() }
+                    let pumpEventsToMark = events.filter { _ in pumpEventType.contains(pumpEventType) }
+                    await self.updateInsulinAsUploaded(pumpEventsToMark)
+                case let .failure(error):
+                    debug(.service, "Error synchronizing pump events data: \(String(describing: error))")
                 }
             }
         } catch {
@@ -465,13 +477,17 @@ extension BaseTidepoolManager {
             syncIdentifier: id
         )]
 
-        processQueue.async {
-            tidepoolService.uploadDoseData(created: [], deleted: doseDataToDelete) { result in
+        Task { [weak self] in
+            await self?.uploadSerializer.enqueue { [weak self] in
+                guard let self = self else { return }
+                let result = await self.awaitUpload("dose-delete") { completion in
+                    tidepoolService.uploadDoseData(created: [], deleted: doseDataToDelete, completion: completion)
+                }
                 switch result {
-                case let .failure(error):
-                    debug(.nightscout, "Error synchronizing Dose delete data: \(String(describing: error))")
                 case .success:
-                    debug(.nightscout, "Success synchronizing Dose delete data")
+                    debug(.service, "Success synchronizing Dose delete data")
+                case let .failure(error):
+                    debug(.service, "Error synchronizing Dose delete data: \(String(describing: error))")
                 }
             }
         }
@@ -617,34 +633,36 @@ extension BaseTidepoolManager {
     func uploadGlucose() async {
         do {
             let glucose = try await glucoseStorage.getGlucoseNotYetUploadedToTidepool()
-            uploadGlucose(glucose)
+            await uploadGlucose(glucose)
 
             let manualGlucose = try await glucoseStorage.getManualGlucoseNotYetUploadedToTidepool()
-            uploadGlucose(manualGlucose)
+            await uploadGlucose(manualGlucose)
         } catch {
             debug(.service, "Error fetching glucose data: \(error)")
         }
     }
 
-    func uploadGlucose(_ glucose: [StoredGlucoseSample]) {
+    func uploadGlucose(_ glucose: [StoredGlucoseSample]) async {
         guard !glucose.isEmpty, let tidepoolService = self.tidepoolService else { return }
+        debug(.service, "Tidepool: glucose upload triggered (\(glucose.count) pending)")
 
         let chunks = glucose.chunks(ofCount: tidepoolService.glucoseDataLimit ?? 100)
 
-        processQueue.async {
-            for chunk in chunks {
-                tidepoolService.uploadGlucoseData(chunk) { result in
-                    switch result {
-                    case .success:
-                        debug(.nightscout, "Success synchronizing glucose data")
+        await uploadSerializer.enqueue { [weak self] in
+            guard let self = self else { return }
 
-                        // After successful upload, update the isUploadedToTidepool flag in Core Data
-                        Task {
-                            await self.updateGlucoseAsUploaded(glucose)
-                        }
-                    case let .failure(error):
-                        debug(.nightscout, "Error synchronizing glucose data: \(String(describing: error))")
-                    }
+            for chunk in chunks {
+                let result = await self.awaitUpload("glucose") { completion in
+                    tidepoolService.uploadGlucoseData(chunk, completion: completion)
+                }
+
+                switch result {
+                case .success:
+                    debug(.service, "Success synchronizing glucose data")
+                    // After successful upload, update the isUploadedToTidepool flag in Core Data
+                    await self.updateGlucoseAsUploaded(glucose)
+                case let .failure(error):
+                    debug(.service, "Error synchronizing glucose data: \(String(describing: error))")
                 }
             }
         }
@@ -710,14 +728,16 @@ extension BaseTidepoolManager {
             return
         }
 
-        processQueue.async {
-            tidepoolService.uploadSettingsData([settings]) { result in
-                switch result {
-                case .success:
-                    debug(.service, "Settings uploaded to Tidepool (syncId: \(settings.syncIdentifier))")
-                case let .failure(error):
-                    debug(.service, "Failed to upload settings to Tidepool: \(error)")
-                }
+        await uploadSerializer.enqueue { [weak self] in
+            guard let self = self else { return }
+            let result = await self.awaitUpload("settings") { completion in
+                tidepoolService.uploadSettingsData([settings], completion: completion)
+            }
+            switch result {
+            case .success:
+                debug(.service, "Settings uploaded to Tidepool (syncId: \(settings.syncIdentifier))")
+            case let .failure(error):
+                debug(.service, "Failed to upload settings to Tidepool: \(error)")
             }
         }
     }
@@ -965,7 +985,79 @@ extension Service {
     var rawValue: RawValue {
         [
             "serviceIdentifier": pluginIdentifier,
-            "state": rawState
+            "state": rawState,
         ]
+    }
+}
+
+// MARK: - Upload serialization
+
+/// Runs enqueued async work strictly in order: each operation starts only after the previous one
+/// has fully completed, including its network round-trip.
+private actor TidepoolUploadSerializer {
+    private var tail: Task<Void, Never>?
+
+    func enqueue(_ operation: @escaping () async -> Void) {
+        let previous = tail
+        tail = Task {
+            await previous?.value
+            await operation()
+        }
+    }
+}
+
+/// One-shot resume guard for a continuation raced by a completion handler and a timeout. Only the
+/// first `resume(_:)` takes effect.
+private final class SingleResumer<T>: @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<T, Never>?
+
+    func attach(_ continuation: CheckedContinuation<T, Never>) {
+        lock.lock()
+        defer { lock.unlock() }
+        self.continuation = continuation
+    }
+
+    func resume(_ value: T) {
+        lock.lock()
+        let continuation = self.continuation
+        self.continuation = nil
+        lock.unlock()
+        continuation?.resume(returning: value)
+    }
+}
+
+enum TidepoolUploadError: Error {
+    /// The upload's completion handler never fired within the allotted time.
+    /// `label` identifies which upload (e.g. "glucose", "dose") so the timeout is diagnosable in logs.
+    case timedOut(label: String)
+}
+
+extension BaseTidepoolManager {
+    /// Bridges a completion-based upload into async/await with a timeout, so a call that never calls
+    /// back resolves to a `.timedOut` failure instead of wedging the serializer indefinitely.
+    func awaitUpload(
+        _ label: String,
+        timeout: TimeInterval = 120,
+        _ operation: (@escaping (Result<Bool, Error>) -> Void) -> Void
+    ) async -> Result<Bool, Error> {
+        let resumer = SingleResumer<Result<Bool, Error>>()
+        return await withCheckedContinuation { continuation in
+            resumer.attach(continuation)
+
+            let timeoutTask = Task {
+                do {
+                    try await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
+                } catch {
+                    return // cancelled: completion already fired
+                }
+                resumer.resume(.failure(TidepoolUploadError.timedOut(label: label)))
+            }
+
+            operation { result in
+                timeoutTask.cancel()
+                resumer.resume(result)
+            }
+        }
     }
 }
