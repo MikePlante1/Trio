@@ -988,3 +988,59 @@ actor TidepoolUploadSerializer {
         }
     }
 }
+
+/// One-shot resume guard for a continuation raced by a completion handler and a timeout. Only the
+/// first `resume(_:)` takes effect.
+private final class SingleResumer<T>: @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<T, Never>?
+
+    func attach(_ continuation: CheckedContinuation<T, Never>) {
+        lock.lock()
+        defer { lock.unlock() }
+        self.continuation = continuation
+    }
+
+    func resume(_ value: T) {
+        lock.lock()
+        let continuation = self.continuation
+        self.continuation = nil
+        lock.unlock()
+        continuation?.resume(returning: value)
+    }
+}
+
+enum TidepoolUploadError: Error {
+    /// The upload's completion handler never fired within the allotted time.
+    /// `label` identifies which upload (e.g. "glucose", "dose") so the timeout is diagnosable in logs.
+    case timedOut(label: String)
+}
+
+extension BaseTidepoolManager {
+    /// Bridges a completion-based upload into async/await with a timeout, so a call that never calls
+    /// back resolves to a `.timedOut` failure instead of wedging the serializer indefinitely.
+    static func awaitUpload(
+        _ label: String,
+        timeout: TimeInterval = 120,
+        _ operation: (@escaping (Result<Bool, Error>) -> Void) -> Void
+    ) async -> Result<Bool, Error> {
+        let resumer = SingleResumer<Result<Bool, Error>>()
+        return await withCheckedContinuation { continuation in
+            resumer.attach(continuation)
+
+            let timeoutTask = Task {
+                do {
+                    try await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
+                } catch {
+                    return // cancelled: completion already fired
+                }
+                resumer.resume(.failure(TidepoolUploadError.timedOut(label: label)))
+            }
+
+            operation { result in
+                timeoutTask.cancel()
+                resumer.resume(result)
+            }
+        }
+    }
+}
