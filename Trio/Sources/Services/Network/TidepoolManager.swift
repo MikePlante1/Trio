@@ -222,6 +222,7 @@ extension BaseTidepoolManager {
 
     func uploadCarbs(_ carbs: [CarbsEntry]) {
         guard !carbs.isEmpty, let tidepoolService = self.tidepoolService else { return }
+        debug(.service, "Tidepool: carbs upload triggered (\(carbs.count) pending)")
 
         processQueue.async {
             carbs.chunks(ofCount: tidepoolService.carbDataLimit ?? 100).forEach { chunk in
@@ -232,9 +233,9 @@ extension BaseTidepoolManager {
                 tidepoolService.uploadCarbData(created: syncCarb, updated: [], deleted: []) { result in
                     switch result {
                     case let .failure(error):
-                        debug(.nightscout, "Error synchronizing carbs data with Tidepool: \(String(describing: error))")
+                        debug(.service, "Error synchronizing carbs data with Tidepool: \(String(describing: error))")
                     case .success:
-                        debug(.nightscout, "Success synchronizing carbs data. Upload to Tidepool complete.")
+                        debug(.service, "Success synchronizing carbs data. Upload to Tidepool complete.")
                         // After successful upload, update the isUploadedToTidepool flag in Core Data
                         Task {
                             await self.updateCarbsAsUploaded(carbs)
@@ -292,9 +293,9 @@ extension BaseTidepoolManager {
             tidepoolService.uploadCarbData(created: [], updated: [], deleted: syncCarb) { result in
                 switch result {
                 case let .failure(error):
-                    debug(.nightscout, "Error synchronizing carbs data with Tidepool: \(String(describing: error))")
+                    debug(.service, "Error synchronizing carbs delete data with Tidepool: \(String(describing: error))")
                 case .success:
-                    debug(.nightscout, "Success synchronizing carbs data. Upload to Tidepool complete.")
+                    debug(.service, "Success synchronizing carbs delete data. Upload to Tidepool complete.")
                 }
             }
         }
@@ -314,6 +315,7 @@ extension BaseTidepoolManager {
 
     func uploadDose(_ events: [PumpHistoryEvent]) async {
         guard !events.isEmpty, let tidepoolService = self.tidepoolService else { return }
+        debug(.service, "Tidepool: dose upload triggered (\(events.count) pending)")
 
         do {
             // Fetch all temp basal entries from Core Data for the last 24 hours
@@ -398,9 +400,9 @@ extension BaseTidepoolManager {
                     tidepoolService.uploadDoseData(created: insulinDoseEvents, deleted: []) { result in
                         switch result {
                         case let .failure(error):
-                            debug(.nightscout, "Error synchronizing dose data with Tidepool: \(String(describing: error))")
+                            debug(.service, "Error synchronizing dose data with Tidepool: \(String(describing: error))")
                         case .success:
-                            debug(.nightscout, "Success synchronizing dose data. Upload to Tidepool complete.")
+                            debug(.service, "Success synchronizing dose data. Upload to Tidepool complete.")
                             Task {
                                 let insulinEvents = events.filter {
                                     $0.type == .tempBasal || $0.type == .tempBasalDuration || $0.type == .bolus
@@ -413,9 +415,9 @@ extension BaseTidepoolManager {
                     tidepoolService.uploadPumpEventData(pumpEvents) { result in
                         switch result {
                         case let .failure(error):
-                            debug(.nightscout, "Error synchronizing pump events data: \(String(describing: error))")
+                            debug(.service, "Error synchronizing pump events data: \(String(describing: error))")
                         case .success:
-                            debug(.nightscout, "Success synchronizing pump events data. Upload to Tidepool complete.")
+                            debug(.service, "Success synchronizing pump events data. Upload to Tidepool complete.")
                             Task {
                                 let pumpEventType = events.map { $0.type.mapEventTypeToPumpEventType() }
                                 let pumpEvents = events.filter { _ in pumpEventType.contains(pumpEventType) }
@@ -469,9 +471,9 @@ extension BaseTidepoolManager {
             tidepoolService.uploadDoseData(created: [], deleted: doseDataToDelete) { result in
                 switch result {
                 case let .failure(error):
-                    debug(.nightscout, "Error synchronizing Dose delete data: \(String(describing: error))")
+                    debug(.service, "Error synchronizing Dose delete data: \(String(describing: error))")
                 case .success:
-                    debug(.nightscout, "Success synchronizing Dose delete data")
+                    debug(.service, "Success synchronizing Dose delete data")
                 }
             }
         }
@@ -628,6 +630,7 @@ extension BaseTidepoolManager {
 
     func uploadGlucose(_ glucose: [StoredGlucoseSample]) {
         guard !glucose.isEmpty, let tidepoolService = self.tidepoolService else { return }
+        debug(.service, "Tidepool: glucose upload triggered (\(glucose.count) pending)")
 
         let chunks = glucose.chunks(ofCount: tidepoolService.glucoseDataLimit ?? 100)
 
@@ -636,14 +639,14 @@ extension BaseTidepoolManager {
                 tidepoolService.uploadGlucoseData(chunk) { result in
                     switch result {
                     case .success:
-                        debug(.nightscout, "Success synchronizing glucose data")
+                        debug(.service, "Success synchronizing glucose data")
 
                         // After successful upload, update the isUploadedToTidepool flag in Core Data
                         Task {
                             await self.updateGlucoseAsUploaded(glucose)
                         }
                     case let .failure(error):
-                        debug(.nightscout, "Error synchronizing glucose data: \(String(describing: error))")
+                        debug(.service, "Error synchronizing glucose data: \(String(describing: error))")
                     }
                 }
             }
