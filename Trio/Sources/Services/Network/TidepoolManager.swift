@@ -234,7 +234,7 @@ extension BaseTidepoolManager {
             for chunk in carbs.chunks(ofCount: tidepoolService.carbDataLimit ?? 100) {
                 let syncCarb: [SyncCarbObject] = Array(chunk).map { $0.convertSyncCarb() }
 
-                let result = await self.awaitUpload("carbs") { completion in
+                let result = await Self.awaitUpload("carbs") { completion in
                     tidepoolService.uploadCarbData(created: syncCarb, updated: [], deleted: [], completion: completion)
                 }
 
@@ -294,9 +294,8 @@ extension BaseTidepoolManager {
         )]
 
         Task { [weak self] in
-            await self?.uploadSerializer.enqueue { [weak self] in
-                guard let self = self else { return }
-                let result = await self.awaitUpload("carbs-delete") { completion in
+            await self?.uploadSerializer.enqueue {
+                let result = await Self.awaitUpload("carbs-delete") { completion in
                     tidepoolService.uploadCarbData(created: [], updated: [], deleted: syncCarb, completion: completion)
                 }
                 switch result {
@@ -332,7 +331,7 @@ extension BaseTidepoolManager {
                 onContext: backgroundContext,
                 predicate: NSCompoundPredicate(andPredicateWithSubpredicates: [
                     NSPredicate.pumpHistoryLast24h,
-                    NSPredicate(format: "tempBasal != nil"),
+                    NSPredicate(format: "tempBasal != nil")
                 ]),
                 key: "timestamp",
                 ascending: true,
@@ -411,7 +410,7 @@ extension BaseTidepoolManager {
             await uploadSerializer.enqueue { [weak self] in
                 guard let self = self else { return }
 
-                let doseResult = await self.awaitUpload("dose") { completion in
+                let doseResult = await Self.awaitUpload("dose") { completion in
                     tidepoolService.uploadDoseData(created: insulinDoseEvents, deleted: [], completion: completion)
                 }
                 switch doseResult {
@@ -425,7 +424,7 @@ extension BaseTidepoolManager {
                     debug(.service, "Error synchronizing dose data with Tidepool: \(String(describing: error))")
                 }
 
-                let pumpResult = await self.awaitUpload("pumpEvents") { completion in
+                let pumpResult = await Self.awaitUpload("pumpEvents") { completion in
                     tidepoolService.uploadPumpEventData(pumpEvents, completion: completion)
                 }
                 switch pumpResult {
@@ -478,9 +477,8 @@ extension BaseTidepoolManager {
         )]
 
         Task { [weak self] in
-            await self?.uploadSerializer.enqueue { [weak self] in
-                guard let self = self else { return }
-                let result = await self.awaitUpload("dose-delete") { completion in
+            await self?.uploadSerializer.enqueue {
+                let result = await Self.awaitUpload("dose-delete") { completion in
                     tidepoolService.uploadDoseData(created: [], deleted: doseDataToDelete, completion: completion)
                 }
                 switch result {
@@ -652,7 +650,7 @@ extension BaseTidepoolManager {
             guard let self = self else { return }
 
             for chunk in chunks {
-                let result = await self.awaitUpload("glucose") { completion in
+                let result = await Self.awaitUpload("glucose") { completion in
                     tidepoolService.uploadGlucoseData(chunk, completion: completion)
                 }
 
@@ -728,9 +726,8 @@ extension BaseTidepoolManager {
             return
         }
 
-        await uploadSerializer.enqueue { [weak self] in
-            guard let self = self else { return }
-            let result = await self.awaitUpload("settings") { completion in
+        await uploadSerializer.enqueue {
+            let result = await Self.awaitUpload("settings") { completion in
                 tidepoolService.uploadSettingsData([settings], completion: completion)
             }
             switch result {
@@ -985,7 +982,7 @@ extension Service {
     var rawValue: RawValue {
         [
             "serviceIdentifier": pluginIdentifier,
-            "state": rawState,
+            "state": rawState
         ]
     }
 }
@@ -994,7 +991,7 @@ extension Service {
 
 /// Runs enqueued async work strictly in order: each operation starts only after the previous one
 /// has fully completed, including its network round-trip.
-private actor TidepoolUploadSerializer {
+actor TidepoolUploadSerializer {
     private var tail: Task<Void, Never>?
 
     func enqueue(_ operation: @escaping () async -> Void) {
@@ -1036,7 +1033,7 @@ enum TidepoolUploadError: Error {
 extension BaseTidepoolManager {
     /// Bridges a completion-based upload into async/await with a timeout, so a call that never calls
     /// back resolves to a `.timedOut` failure instead of wedging the serializer indefinitely.
-    func awaitUpload(
+    static func awaitUpload(
         _ label: String,
         timeout: TimeInterval = 120,
         _ operation: (@escaping (Result<Bool, Error>) -> Void) -> Void
