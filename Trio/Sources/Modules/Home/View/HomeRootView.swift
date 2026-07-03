@@ -4,12 +4,6 @@ import SwiftDate
 import SwiftUI
 import Swinject
 
-struct TimePicker: Identifiable {
-    var active: Bool
-    let hours: Int16
-    var id: String { hours.description }
-}
-
 extension Home {
     struct RootView: BaseView {
         let resolver: Resolver
@@ -36,12 +30,6 @@ extension Home {
         @State var showCGMSelection: Bool = false
         @State var showSnoozeSheet: Bool = false
         @State var notificationsDisabled = false
-        @State var timeButtons: [TimePicker] = [
-            TimePicker(active: false, hours: 4),
-            TimePicker(active: false, hours: 6),
-            TimePicker(active: false, hours: 12),
-            TimePicker(active: false, hours: 24)
-        ]
 
         @FetchRequest(fetchRequest: OverrideStored.fetch(
             NSPredicate.lastActiveOverride,
@@ -351,43 +339,6 @@ extension Home {
             return components.isEmpty ? nil : components.joined(separator: ", ")
         }
 
-        var timeIntervalButtons: some View {
-            let buttonColor = (colorScheme == .dark ? Color.white : Color.black).opacity(0.8)
-
-            return HStack(alignment: .center) {
-                ForEach(timeButtons) { button in
-                    Button(action: {
-                        state.hours = button.hours
-                    }) {
-                        Group {
-                            if button.active {
-                                Text(
-                                    button.hours.description + "\u{00A0}" +
-                                        String(localized: "h", comment: "h")
-                                )
-                            } else {
-                                Text(button.hours.description)
-                            }
-                        }
-                        .font(.footnote)
-                        .fontWeight(button.active ? .semibold : .regular)
-                        .padding(.vertical, 5)
-                        .padding(.horizontal, 10)
-                        .foregroundColor(
-                            button
-                                .active ? (colorScheme == .dark ? Color.bgDarkerDarkBlue : Color.white) : buttonColor
-                        )
-                        .background(button.active ? buttonColor.opacity(colorScheme == .dark ? 1 : 0.8) : Color.clear)
-                        .clipShape(Capsule())
-                        .overlay(
-                            Capsule()
-                                .stroke(button.active ? buttonColor.opacity(0.4) : Color.clear, lineWidth: 2)
-                        )
-                    }
-                }
-            }
-        }
-
         var statsIconString: String {
             if #available(iOS 18, *) {
                 return "chart.line.text.clipboard"
@@ -426,12 +377,10 @@ extension Home {
                     geo: geo,
                     safeAreaSize: notificationsDisabled == true ? safeAreaSize : 0,
                     units: state.units,
-                    hours: state.filteredHours,
                     highGlucose: state.highGlucose,
                     lowGlucose: state.lowGlucose,
                     currentGlucoseTarget: state.currentGlucoseTarget,
                     glucoseColorScheme: state.glucoseColorScheme,
-                    screenHours: state.hours,
                     displayXgridLines: state.displayXgridLines,
                     displayYgridLines: state.displayYgridLines,
                     thresholdLines: state.thresholdLines,
@@ -439,12 +388,6 @@ extension Home {
                 )
             }
             .padding(.bottom, UIDevice.adjustPadding(min: 0, max: nil))
-        }
-
-        func highlightButtons() {
-            for i in 0 ..< timeButtons.count {
-                timeButtons[i].active = timeButtons[i].hours == state.hours
-            }
         }
 
         @ViewBuilder func rightHeaderPanel(_: GeometryProxy) -> some View {
@@ -941,11 +884,6 @@ extension Home {
 
                     Spacer()
 
-                    timeIntervalButtons.padding(.top, UIDevice.adjustPadding(min: 0, max: 10))
-                        .padding(.bottom, UIDevice.adjustPadding(min: 0, max: 10))
-
-                    Spacer()
-
                     tappableButton(
                         buttonColor: (colorScheme == .dark ? Color.white : Color.black).opacity(0.8),
                         label: String(localized: "Info", comment: "Info icon in main view"),
@@ -979,13 +917,8 @@ extension Home {
             GeometryReader { geo in
                 mainViewElements(geo)
             }
-            .onChange(of: state.hours) {
-                highlightButtons()
-            }
             .onAppear {
-                configureView {
-                    highlightButtons()
-                }
+                configureView()
             }
             .navigationTitle("Home")
             .navigationBarHidden(true)

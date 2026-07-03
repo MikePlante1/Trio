@@ -32,8 +32,7 @@ extension Home {
         }
 
         private let timer = DispatchTimer(timeInterval: 30)
-        private(set) var filteredHours = 24
-        var startMarker = Date(timeIntervalSinceNow: TimeInterval(hours: -24))
+        var startMarker = Date(timeIntervalSinceNow: -MainChartHelper.Config.chartHistorySeconds)
         var endMarker = Date(timeIntervalSinceNow: TimeInterval(hours: 3))
         var manualGlucose: [BloodGlucose] = []
         var uploadStats = false
@@ -82,7 +81,6 @@ extension Home {
         var displayYgridLines: Bool = false
         var thresholdLines: Bool = false
         var bolusDisplayThreshold: BolusDisplayThreshold = .allUnits
-        var hours: Int16 = 6
         var totalBolus: Decimal = 0
         var isLoopStatusPresented: Bool = false
         var isLegendPresented: Bool = false
