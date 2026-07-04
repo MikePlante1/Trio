@@ -2,6 +2,17 @@ import Charts
 import Foundation
 import SwiftUI
 
+/// Plot-area rect of the COB/IOB pane within its own frame. The hour labels shrink the
+/// plot below `cobIobHeight` (varying with Dynamic Type), so the shell's selection
+/// overlay needs the real rect to place its dots on the lines.
+struct CobIobPlotAreaPreferenceKey: PreferenceKey {
+    static let defaultValue: CGRect = .zero
+    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
+        let next = nextValue()
+        if next != .zero { value = next }
+    }
+}
+
 extension MainChartCanvas {
     var cobIobChart: some View {
         Chart {
@@ -18,6 +29,14 @@ extension MainChartCanvas {
         .chartXAxis { basalChartXAxis }
         .chartYAxis { cobIobChartYAxis }
         .chartYScale(domain: combinedYDomain())
+        .chartBackground { proxy in
+            GeometryReader { geo in
+                Color.clear.preference(
+                    key: CobIobPlotAreaPreferenceKey.self,
+                    value: proxy.plotFrame.map { geo[$0] } ?? .zero
+                )
+            }
+        }
     }
 
     func combinedYDomain() -> ClosedRange<Double> {

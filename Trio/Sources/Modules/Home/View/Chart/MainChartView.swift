@@ -87,6 +87,10 @@ struct MainChartView: View {
     /// Auto-pans the chart while a scrubbing finger rests in the viewport's edge zones.
     @State private var edgePanTask: Task<Void, Never>?
 
+    /// Measured plot-area rect of the COB/IOB pane (in the pane's own coordinates):
+    /// the hour labels make the plot shorter than `cobIobHeight`, varying with Dynamic Type.
+    @State private var cobIobPlotArea: CGRect = .zero
+
     var body: some View {
         ZStack(alignment: .topLeading) {
             MainChartCanvas(
@@ -142,6 +146,7 @@ struct MainChartView: View {
         )
         .clipped()
         .contentShape(Rectangle())
+        .onPreferenceChange(CobIobPlotAreaPreferenceKey.self) { cobIobPlotArea = $0 }
         .simultaneousGesture(panAndInspectGesture)
         .simultaneousGesture(magnifyGesture)
         .onDisappear {
@@ -261,7 +266,11 @@ extension MainChartView {
         )
         let span = domain.upperBound - domain.lowerBound
         let fraction = span == 0 ? 0.5 : (value - domain.lowerBound) / span
-        return basalHeight + mainHeight + cobIobHeight * CGFloat(1 - min(max(fraction, 0), 1))
+        // Map onto the measured plot rect; fall back to the full pane height until the
+        // first measurement arrives.
+        let plotTop = basalHeight + mainHeight + cobIobPlotArea.minY
+        let plotHeight = cobIobPlotArea.height > 0 ? cobIobPlotArea.height : cobIobHeight
+        return plotTop + plotHeight * CGFloat(1 - min(max(fraction, 0), 1))
     }
 
     /// Dark fade pinned to the trailing edge whenever "now" is scrolled off-screen.
