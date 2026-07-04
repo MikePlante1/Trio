@@ -874,6 +874,8 @@ extension Home {
 
                 mainChart(geo: geo)
 
+                Spacer(minLength: 0)
+
                 HStack {
                     tappableButton(
                         buttonColor: (colorScheme == .dark ? Color.white : Color.black).opacity(0.8),
