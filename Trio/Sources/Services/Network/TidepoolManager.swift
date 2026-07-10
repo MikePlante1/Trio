@@ -31,6 +31,7 @@ final class BaseTidepoolManager: TidepoolManager, Injectable {
     @Injected() private var pumpHistoryStorage: PumpHistoryStorage!
     @Injected() private var apsManager: APSManager!
     @Injected() private var settingsManager: SettingsManager!
+    @Injected() private var notificationCenter: NotificationCenter!
 
     // Lazy access to avoid circular dependency (TidepoolManager ↔ FetchGlucoseManager)
     private var resolver: Resolver?
@@ -90,6 +91,16 @@ final class BaseTidepoolManager: TidepoolManager, Injectable {
                 Task {
                     await self.uploadGlucose()
                 }
+            }
+            .store(in: &subscriptions)
+
+        // Enqueues stall while the pipeline is backlogged, so foregrounding is the reliable
+        // recovery point for a wedged upload chain.
+        notificationCenter
+            .publisher(for: UIApplication.didBecomeActiveNotification)
+            .sink { [weak self] _ in
+                guard let self = self else { return }
+                Task(priority: .utility) { await self.uploadSerializer.recoverIfWedged() }
             }
             .store(in: &subscriptions)
 
@@ -228,10 +239,12 @@ extension BaseTidepoolManager {
         guard !carbs.isEmpty, let tidepoolService = self.tidepoolService else { return }
         debug(.service, "Tidepool: carbs upload triggered (\(carbs.count) pending)")
 
-        await uploadSerializer.enqueue { [weak self] in
+        await uploadSerializer.enqueue("carbs") { [weak self] generation in
             guard let self = self else { return }
 
             for chunk in carbs.chunks(ofCount: tidepoolService.carbDataLimit ?? 100) {
+                guard await self.uploadSerializer.isCurrent(generation) else { return }
+
                 let syncCarb: [SyncCarbObject] = Array(chunk).map { $0.convertSyncCarb() }
 
                 let result = await Self.awaitUpload("carbs") { completion in
@@ -294,7 +307,7 @@ extension BaseTidepoolManager {
         )]
 
         Task { [weak self] in
-            await self?.uploadSerializer.enqueue {
+            await self?.uploadSerializer.enqueue("carbs-delete") { _ in
                 let result = await Self.awaitUpload("carbs-delete") { completion in
                     tidepoolService.uploadCarbData(created: [], updated: [], deleted: syncCarb, completion: completion)
                 }
@@ -407,7 +420,7 @@ extension BaseTidepoolManager {
                     return (insulinDoseEvents, pumpEvents)
                 }
 
-            await uploadSerializer.enqueue { [weak self] in
+            await uploadSerializer.enqueue("dose") { [weak self] generation in
                 guard let self = self else { return }
 
                 let doseResult = await Self.awaitUpload("dose") { completion in
@@ -423,6 +436,8 @@ extension BaseTidepoolManager {
                 case let .failure(error):
                     debug(.service, "Error synchronizing dose data with Tidepool: \(String(describing: error))")
                 }
+
+                guard await self.uploadSerializer.isCurrent(generation) else { return }
 
                 let pumpResult = await Self.awaitUpload("pumpEvents") { completion in
                     tidepoolService.uploadPumpEventData(pumpEvents, completion: completion)
@@ -477,7 +492,7 @@ extension BaseTidepoolManager {
         )]
 
         Task { [weak self] in
-            await self?.uploadSerializer.enqueue {
+            await self?.uploadSerializer.enqueue("dose-delete") { _ in
                 let result = await Self.awaitUpload("dose-delete") { completion in
                     tidepoolService.uploadDoseData(created: [], deleted: doseDataToDelete, completion: completion)
                 }
@@ -646,10 +661,12 @@ extension BaseTidepoolManager {
 
         let chunks = glucose.chunks(ofCount: tidepoolService.glucoseDataLimit ?? 100)
 
-        await uploadSerializer.enqueue { [weak self] in
+        await uploadSerializer.enqueue("glucose") { [weak self] generation in
             guard let self = self else { return }
 
             for chunk in chunks {
+                guard await self.uploadSerializer.isCurrent(generation) else { return }
+
                 let result = await Self.awaitUpload("glucose") { completion in
                     tidepoolService.uploadGlucoseData(chunk, completion: completion)
                 }
@@ -726,7 +743,7 @@ extension BaseTidepoolManager {
             return
         }
 
-        await uploadSerializer.enqueue {
+        await uploadSerializer.enqueue("settings") { _ in
             let result = await Self.awaitUpload("settings") { completion in
                 tidepoolService.uploadSettingsData([settings], completion: completion)
             }
@@ -991,17 +1008,69 @@ extension Service {
 
 /// Runs enqueued async work strictly in order: each operation starts only after the previous one
 /// has fully completed, including its network round-trip.
+///
+/// A wall-clock watchdog abandons the chain when the head operation exceeds `watchdogLimit`,
+/// e.g. because the app was suspended mid-request and the completion never fired. Wall clock is
+/// deliberate: it keeps advancing while the process is suspended. Abandoning bumps `generation`
+/// so orphaned operations can bail out instead of racing the replacement chain.
 actor TidepoolUploadSerializer {
+    private let watchdogLimit: TimeInterval
     private var tail: Task<Void, Never>?
+    private var generation = 0
+    private var headOperationLabel: String?
+    private var headOperationStart: Date?
 
-    func enqueue(_ operation: @escaping () async -> Void) {
+    init(watchdogLimit: TimeInterval = 10 * 60) {
+        self.watchdogLimit = watchdogLimit
+    }
+
+    /// True while `generation` identifies the live chain. Operations making more than one
+    /// network call re-check this between calls and bail out once their chain is abandoned.
+    func isCurrent(_ generation: Int) -> Bool {
+        generation == self.generation
+    }
+
+    func enqueue(_ label: String, _ operation: @escaping (_ generation: Int) async -> Void) {
+        recoverIfWedged()
+        let generation = generation
         let previous = tail
         // .utility: the inherited .background QoS is not scheduled during background
         // execution windows, freezing uploads until the app is foregrounded.
         tail = Task(priority: .utility) {
             await previous?.value
-            await operation()
+            guard await self.begin(label, generation: generation) else { return }
+            await operation(generation)
+            await self.end(generation: generation)
         }
+    }
+
+    /// Abandons the chain if its head operation has exceeded the wall-clock watchdog limit.
+    /// Called from paths that keep running while the pipeline itself is wedged.
+    func recoverIfWedged() {
+        guard let start = headOperationStart else { return }
+        let age = Date().timeIntervalSince(start)
+        guard age > watchdogLimit else { return }
+        warning(
+            .service,
+            "Tidepool upload chain wedged: '\(headOperationLabel ?? "?")' has not completed after \(Int(age))s; abandoning chain and starting fresh"
+        )
+        generation += 1
+        tail = nil
+        headOperationStart = nil
+        headOperationLabel = nil
+    }
+
+    private func begin(_ label: String, generation: Int) -> Bool {
+        guard isCurrent(generation) else { return false }
+        headOperationStart = Date()
+        headOperationLabel = label
+        return true
+    }
+
+    private func end(generation: Int) {
+        guard isCurrent(generation) else { return }
+        headOperationStart = nil
+        headOperationLabel = nil
     }
 }
 

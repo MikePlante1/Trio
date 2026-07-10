@@ -31,7 +31,7 @@ private actor Recorder {
         let count = 10
 
         for index in 0 ..< count {
-            await serializer.enqueue {
+            await serializer.enqueue("op-\(index)") { _ in
                 await recorder.begin(index)
                 // Yield instead of sleeping: a real-time sleep makes the stress depend on machine
                 // speed (and can mask a race on a fast box). `Task.yield()` deterministically hands
@@ -44,7 +44,7 @@ private actor Recorder {
 
         // Enqueue a sentinel last and await it; the chain guarantees it runs after all prior work.
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-            Task { await serializer.enqueue { continuation.resume() } }
+            Task { await serializer.enqueue("sentinel") { _ in continuation.resume() } }
         }
 
         #expect(await recorder.order == Array(0 ..< count))
