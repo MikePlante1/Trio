@@ -105,6 +105,15 @@ final class BaseTidepoolManager: TidepoolManager, Injectable {
             .store(in: &subscriptions)
 
         registerHandlers()
+
+        // Catch up on backlog from a previous run: dose/carb uploads are only triggered by new
+        // Core Data saves, so without this they wait for the next pump event.
+        Task(priority: .utility) { [weak self] in
+            guard let self = self, self.tidepoolService != nil else { return }
+            await self.uploadInsulin()
+            await self.uploadCarbs()
+            await self.uploadGlucose()
+        }
     }
 
     /// Loads the Tidepool service from saved state
