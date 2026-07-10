@@ -22,6 +22,23 @@ private actor Recorder {
     }
 }
 
+/// One-shot async gate: `wait()` suspends until `open()`; opening before anyone waits is remembered.
+private actor Gate {
+    private var opened = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    func wait() async {
+        if opened { return }
+        await withCheckedContinuation { waiters.append($0) }
+    }
+
+    func open() {
+        opened = true
+        for waiter in waiters { waiter.resume() }
+        waiters.removeAll()
+    }
+}
+
 @Suite("Tidepool upload serialization") struct TidepoolUploadSerializerTests {
     /// Operations must run one at a time, in enqueue order. If two ever overlapped, `maxActive`
     /// would exceed 1; if the chain reordered, `order` wouldn't be 0..<count.
@@ -49,6 +66,71 @@ private actor Recorder {
 
         #expect(await recorder.order == Array(0 ..< count))
         #expect(await recorder.maxActive == 1)
+    }
+
+    @Test("Watchdog abandons a wedged chain so later uploads run again") func watchdogRecoversWedgedChain() async {
+        let serializer = TidepoolUploadSerializer(watchdogLimit: 0.2)
+        let started = Gate()
+
+        // Head op wedges forever — simulates a completion lost while the app was suspended.
+        await serializer.enqueue("wedged") { _ in
+            await started.open()
+            await withCheckedContinuation { (_: CheckedContinuation<Void, Never>) in }
+        }
+
+        // Only start the clock once the op is definitely running, then exceed the limit.
+        await started.wait()
+        try? await Task.sleep(nanoseconds: 300_000_000)
+
+        // The next enqueue trips the watchdog; the new op must run on a fresh chain instead of
+        // queueing forever behind the wedged one.
+        let ran = await withCheckedContinuation { continuation in
+            Task {
+                await serializer.enqueue("fresh") { _ in continuation.resume(returning: true) }
+            }
+        }
+        #expect(ran)
+    }
+
+    @Test("An abandoned operation sees a stale generation and bails out") func abandonedOperationSeesStaleGeneration() async {
+        let serializer = TidepoolUploadSerializer(watchdogLimit: 0.2)
+        let started = Gate()
+        let release = Gate()
+
+        async let observed: Bool = withCheckedContinuation { continuation in
+            Task {
+                await serializer.enqueue("orphan") { generation in
+                    await started.open()
+                    await release.wait() // held wedged past the watchdog limit
+                    await continuation.resume(returning: serializer.isCurrent(generation))
+                }
+            }
+        }
+
+        await started.wait()
+        try? await Task.sleep(nanoseconds: 300_000_000)
+        await serializer.recoverIfWedged() // watchdog abandons the chain
+
+        // The resumed orphan must read its generation as stale.
+        await release.open()
+        #expect(await observed == false)
+    }
+
+    @Test("Watchdog leaves an idle chain alone") func watchdogIgnoresIdleChain() async {
+        let serializer = TidepoolUploadSerializer(watchdogLimit: 0.1)
+
+        let firstGeneration = await withCheckedContinuation { continuation in
+            Task { await serializer.enqueue("first") { continuation.resume(returning: $0) } }
+        }
+
+        // Well past the limit, but with no operation running the watchdog must not trip.
+        try? await Task.sleep(nanoseconds: 300_000_000)
+        await serializer.recoverIfWedged()
+
+        let secondGeneration = await withCheckedContinuation { continuation in
+            Task { await serializer.enqueue("second") { continuation.resume(returning: $0) } }
+        }
+        #expect(firstGeneration == secondGeneration)
     }
 
     @Test("awaitUpload returns the completion's result") func awaitUploadReturnsResult() async {
