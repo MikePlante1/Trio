@@ -996,7 +996,9 @@ actor TidepoolUploadSerializer {
 
     func enqueue(_ operation: @escaping () async -> Void) {
         let previous = tail
-        tail = Task {
+        // .utility: the inherited .background QoS is not scheduled during background
+        // execution windows, freezing uploads until the app is foregrounded.
+        tail = Task(priority: .utility) {
             await previous?.value
             await operation()
         }
