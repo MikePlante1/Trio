@@ -11,7 +11,7 @@ extension UserInterfaceSettings {
         @Published var forecastDisplayType: ForecastDisplayType = .cone
         @Published var showCarbsRequiredBadge: Bool = true
         @Published var carbsRequiredThreshold: Decimal = 0
-        @Published var glucoseColorScheme: GlucoseColorScheme = .staticColor
+        @Published var glucoseColorScheme: GlucoseColorScheme = .dynamicColor
         @Published var eA1cDisplayUnit: EstimatedA1cDisplayUnit = .percent
         @Published var timeInRangeType: TimeInRangeType = .timeInTightRange
         @Published var requireAdjustmentsConfirmation: Bool = false

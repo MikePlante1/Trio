@@ -41,7 +41,7 @@ struct TrioSettings: JSON, Equatable, Encodable {
     var eA1cDisplayUnit: EstimatedA1cDisplayUnit = .percent
     var high: Decimal = 180
     var low: Decimal = 70
-    var glucoseColorScheme: GlucoseColorScheme = .staticColor
+    var glucoseColorScheme: GlucoseColorScheme = .dynamicColor
     var xGridLines: Bool = true
     var yGridLines: Bool = true
     var hideInsulinBadge: Bool = false

@@ -127,13 +127,7 @@ extension UserInterfaceSettings {
                                                     "Set the color scheme for glucose readings on the main glucose graph, live activities, and bolus calculator. Descriptions for each option found below."
                                                 )
                                                 VStack(alignment: .leading, spacing: 5) {
-                                                    Text("Static:").bold()
-                                                    Text("Red = Below Range")
-                                                    Text("Green = In Range")
-                                                    Text("Yellow = Above Range")
-                                                }
-                                                VStack(alignment: .leading, spacing: 5) {
-                                                    Text("Dynamic:").bold()
+                                                    Text("Dynamic (Default):").bold()
                                                     Text("Green = At Target")
                                                     Text(
                                                         "Gradient Red = As readings approach and exceed below target, they gradually become more red."
@@ -141,6 +135,12 @@ extension UserInterfaceSettings {
                                                     Text(
                                                         "Gradient Purple = As readings approach and exceed above target, they become more purple."
                                                     )
+                                                }
+                                                VStack(alignment: .leading, spacing: 5) {
+                                                    Text("Static:").bold()
+                                                    Text("Red = Below Range")
+                                                    Text("Green = In Range")
+                                                    Text("Yellow = Above Range")
                                                 }
                                             }
                                         )
