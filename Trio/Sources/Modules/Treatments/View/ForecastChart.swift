@@ -147,11 +147,11 @@ struct ForecastChart: View {
                 .zIndex(-1)
                 .symbolSize(CGSize(width: 15, height: 15))
                 .foregroundStyle(
-                    Decimal(selectedGlucose.glucose) > state.highGlucose ? Color.orange
+                    Decimal(selectedGlucose.glucose) > state.highGlucose ? Color.staticHigh
                         .opacity(0.8) :
                         (
-                            Decimal(selectedGlucose.glucose) < state.lowGlucose ? Color.red.opacity(0.8) : Color.green
-                                .opacity(0.8)
+                            Decimal(selectedGlucose.glucose) < state.lowGlucose ? Color.staticLow.opacity(0.8)
+                                : Color.staticInRange.opacity(0.8)
                         )
                 )
 
