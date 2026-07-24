@@ -930,46 +930,8 @@ extension Home {
         }
 
         private func getCurrentGlucoseTarget() async {
-            let now = Date()
-            let calendar = Calendar.current
-
-            let entries: [(start: String, value: Decimal)] = bgTargets.targets.map { ($0.start, $0.low) }
-
-            for (index, entry) in entries.enumerated() {
-                guard let entryTime = TherapySettingsUtil.parseTime(entry.start) else {
-                    debug(.default, "Invalid entry start time: \(entry.start)")
-                    continue
-                }
-
-                let entryComponents = calendar.dateComponents([.hour, .minute, .second], from: entryTime)
-                let entryStartTime = calendar.date(
-                    bySettingHour: entryComponents.hour!,
-                    minute: entryComponents.minute!,
-                    second: entryComponents.second!,
-                    of: now
-                )!
-
-                let entryEndTime: Date
-                if index < entries.count - 1,
-                   let nextEntryTime = TherapySettingsUtil.parseTime(entries[index + 1].start)
-                {
-                    let nextEntryComponents = calendar.dateComponents([.hour, .minute, .second], from: nextEntryTime)
-                    entryEndTime = calendar.date(
-                        bySettingHour: nextEntryComponents.hour!,
-                        minute: nextEntryComponents.minute!,
-                        second: nextEntryComponents.second!,
-                        of: now
-                    )!
-                } else {
-                    entryEndTime = calendar.date(byAdding: .day, value: 1, to: entryStartTime)!
-                }
-
-                if now >= entryStartTime, now < entryEndTime {
-                    await MainActor.run {
-                        currentGlucoseTarget = entry.value
-                    }
-                    return
-                }
+            if let target = bgTargets.currentTarget() {
+                await MainActor.run { currentGlucoseTarget = target }
             }
         }
 
