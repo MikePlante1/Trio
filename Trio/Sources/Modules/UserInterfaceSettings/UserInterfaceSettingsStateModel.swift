@@ -15,6 +15,7 @@ extension UserInterfaceSettings {
         @Published var eA1cDisplayUnit: EstimatedA1cDisplayUnit = .percent
         @Published var timeInRangeType: TimeInRangeType = .timeInTightRange
         @Published var requireAdjustmentsConfirmation: Bool = false
+        @Published var currentGlucoseTarget: Decimal = 100
 
         var units: GlucoseUnits = .mgdL
 
@@ -48,6 +49,53 @@ extension UserInterfaceSettings {
 
             subscribeSetting(\.requireAdjustmentsConfirmation, on: $requireAdjustmentsConfirmation) {
                 requireAdjustmentsConfirmation = $0 }
+
+            Task { await getCurrentGlucoseTarget() }
+        }
+
+        /// Resolves the glucose target active right now from the BG target schedule.
+        /// NOTE: same logic as HomeStateModel/AdjustmentsStateModel — candidate for a shared helper.
+        func getCurrentGlucoseTarget() async {
+            let now = Date()
+            let calendar = Calendar.current
+            let dateFormatter = DateFormatter()
+            dateFormatter.dateFormat = "HH:mm:ss"
+            dateFormatter.timeZone = TimeZone.current
+
+            let bgTargets = await provider.getBGTargets()
+            let entries: [(start: String, value: Decimal)] = bgTargets.targets.map { ($0.start, $0.low) }
+
+            for (index, entry) in entries.enumerated() {
+                guard let entryTime = dateFormatter.date(from: entry.start) else { continue }
+
+                let entryComponents = calendar.dateComponents([.hour, .minute, .second], from: entryTime)
+                let entryStartTime = calendar.date(
+                    bySettingHour: entryComponents.hour!,
+                    minute: entryComponents.minute!,
+                    second: entryComponents.second!,
+                    of: now
+                )!
+
+                let entryEndTime: Date
+                if index < entries.count - 1,
+                   let nextEntryTime = dateFormatter.date(from: entries[index + 1].start)
+                {
+                    let nextEntryComponents = calendar.dateComponents([.hour, .minute, .second], from: nextEntryTime)
+                    entryEndTime = calendar.date(
+                        bySettingHour: nextEntryComponents.hour!,
+                        minute: nextEntryComponents.minute!,
+                        second: nextEntryComponents.second!,
+                        of: now
+                    )!
+                } else {
+                    entryEndTime = calendar.date(byAdding: .day, value: 1, to: entryStartTime)!
+                }
+
+                if now >= entryStartTime, now < entryEndTime {
+                    await MainActor.run { currentGlucoseTarget = entry.value }
+                    return
+                }
+            }
         }
     }
 }
