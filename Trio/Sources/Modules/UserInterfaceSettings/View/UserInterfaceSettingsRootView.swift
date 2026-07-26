@@ -127,20 +127,27 @@ extension UserInterfaceSettings {
                                                     "Set the color scheme for glucose readings on the main glucose graph, live activities, and bolus calculator. Descriptions for each option found below."
                                                 )
                                                 VStack(alignment: .leading, spacing: 5) {
-                                                    Text("Static:").bold()
-                                                    Text("Red = Below Range")
-                                                    Text("Green = In Range")
-                                                    Text("Yellow = Above Range")
-                                                }
-                                                VStack(alignment: .leading, spacing: 5) {
-                                                    Text("Dynamic:").bold()
+                                                    Text("Dynamic (Default):").bold()
                                                     Text("Green = At Target")
                                                     Text(
                                                         "Gradient Red = As readings approach and exceed below target, they gradually become more red."
                                                     )
+                                                    .fixedSize(horizontal: false, vertical: true)
                                                     Text(
                                                         "Gradient Purple = As readings approach and exceed above target, they become more purple."
                                                     )
+                                                    .fixedSize(horizontal: false, vertical: true)
+                                                    GlucoseColorGradientPreview(
+                                                        units: state.units,
+                                                        target: state.currentGlucoseTarget
+                                                    )
+                                                    .padding(.top, 6)
+                                                }
+                                                VStack(alignment: .leading, spacing: 5) {
+                                                    Text("Static:").bold()
+                                                    Text("Red = Below Range")
+                                                    Text("Green = In Range")
+                                                    Text("Purple = Above Range")
                                                 }
                                             }
                                         )
@@ -645,5 +652,90 @@ extension UserInterfaceSettings {
             .navigationBarTitleDisplayMode(.automatic)
             .settingsHighlightScroll()
         }
+    }
+}
+
+/// Illustrative bar that samples `getDynamicGlucoseColor` across the glucose range,
+/// so the hint shows exactly how the dynamic scheme colors readings from low to high.
+private struct GlucoseColorGradientPreview: View {
+    let units: GlucoseUnits
+    // User's current glucose target — the green peak of the dynamic sweep.
+    let target: Decimal
+
+    private let minGlucose: Decimal = 40
+    private let maxGlucose: Decimal = 250
+
+    // Fixed anchors the dynamic scheme uses on the glucose graph: solid red at/below,
+    // solid purple at/above, sweeping red → green → purple between them.
+    private let hardCodedLow: Decimal = 55
+    private let hardCodedHigh: Decimal = 220
+
+    private var markerValues: [Decimal] {
+        [hardCodedLow, target, hardCodedHigh]
+    }
+
+    private var gradientStops: [Gradient.Stop] {
+        let steps = 60
+        return (0 ... steps).map { step in
+            let location = Double(step) / Double(steps)
+            let value = minGlucose + (maxGlucose - minGlucose) * Decimal(location)
+            return Gradient.Stop(
+                color: getDynamicGlucoseColor(
+                    glucoseValue: value,
+                    highGlucoseColorValue: hardCodedHigh,
+                    lowGlucoseColorValue: hardCodedLow,
+                    targetGlucose: target,
+                    glucoseColorScheme: .dynamicColor
+                ),
+                location: location
+            )
+        }
+    }
+
+    private func fraction(of value: Decimal) -> CGFloat {
+        let raw = (value - minGlucose) / (maxGlucose - minGlucose)
+        return min(max(CGFloat(truncating: raw as NSNumber), 0), 1)
+    }
+
+    private func axisValue(_ value: Decimal) -> String {
+        let display = units == .mgdL ? value : value.asMmolL
+        return "\(display)"
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            RoundedRectangle(cornerRadius: 8)
+                .fill(LinearGradient(
+                    gradient: Gradient(stops: gradientStops),
+                    startPoint: .leading,
+                    endPoint: .trailing
+                ))
+                .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Color.primary.opacity(0.12), lineWidth: 1))
+                .frame(height: 26)
+                .shadow(color: .black.opacity(0.18), radius: 3, y: 1)
+
+            GeometryReader { geo in
+                ZStack(alignment: .topLeading) {
+                    ForEach(markerValues, id: \.self) { value in
+                        marker(value, at: fraction(of: value), width: geo.size.width)
+                    }
+                }
+            }
+            .frame(height: 22)
+        }
+        .accessibilityHidden(true)
+    }
+
+    private func marker(_ value: Decimal, at fraction: CGFloat, width: CGFloat) -> some View {
+        VStack(spacing: 1) {
+            Image(systemName: "arrowtriangle.up.fill")
+                .font(.system(size: 7))
+                .foregroundColor(.primary.opacity(0.55))
+            Text(axisValue(value))
+                .font(.caption2)
+                .foregroundColor(.secondary)
+        }
+        .fixedSize()
+        .position(x: min(max(width * fraction, 12), width - 12), y: 11)
     }
 }
