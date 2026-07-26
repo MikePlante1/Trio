@@ -497,16 +497,23 @@ extension Home.RootView {
         }
     }
 
-    func statsDistributionBar(_ segments: [(color: Color, fraction: CGFloat)]) -> some View {
+    /// Each pill groups related bands (e.g. very-low + low) into one capsule; its sub-segments sit flush
+    /// so they read as one range while staying individually colored. Gaps fall only between pills.
+    func statsDistributionBar(_ groups: [[(color: Color, fraction: CGFloat)]]) -> some View {
         GeometryReader { g in
             let spacing: CGFloat = 2
-            let shown = segments.filter { $0.fraction > 0.005 }
+            let shown = groups.filter { group in group.reduce(0) { $0 + $1.fraction } > 0.005 }
             let available = max(g.size.width - spacing * CGFloat(max(shown.count - 1, 0)), 0)
             HStack(spacing: spacing) {
-                ForEach(Array(shown.enumerated()), id: \.offset) { _, segment in
-                    Capsule()
-                        .fill(segment.color)
-                        .frame(width: available * segment.fraction)
+                ForEach(Array(shown.enumerated()), id: \.offset) { _, group in
+                    HStack(spacing: 0) {
+                        ForEach(Array(group.enumerated()), id: \.offset) { _, segment in
+                            Rectangle()
+                                .fill(segment.color)
+                                .frame(width: available * segment.fraction)
+                        }
+                    }
+                    .clipShape(Capsule())
                 }
             }
             .frame(maxHeight: .infinity)
@@ -551,14 +558,20 @@ extension Home.RootView {
         let tirString = hasData
             ? distribution.inRangePct.formatted(.number.precision(.fractionLength(0 ... 1))) + " %"
             : "-- %"
-        let segments: [(color: Color, fraction: CGFloat)] = hasData ? [
-            (.dynamicRed, CGFloat(distribution.veryLowPct / 100)),
-            (.dynamicOrange, CGFloat(distribution.lowPct / 100)),
-            (.dynamicGreen, CGFloat(distribution.inSmallRangePct / 100)),
-            (.dynamicTeal, CGFloat((distribution.inRangePct - distribution.inSmallRangePct) / 100)),
-            (.dynamicBlue, CGFloat(distribution.highPct / 100)),
-            (.dynamicPurple, CGFloat(distribution.veryHighPct / 100))
-        ] : [(Color.secondary.opacity(0.3), 1)]
+        let groups: [[(color: Color, fraction: CGFloat)]] = hasData ? [
+            [
+                (.dynamicRed, CGFloat(distribution.veryLowPct / 100)),
+                (.dynamicOrange, CGFloat(distribution.lowPct / 100))
+            ],
+            [
+                (.dynamicGreen, CGFloat(distribution.inSmallRangePct / 100)),
+                (.dynamicTeal, CGFloat((distribution.inRangePct - distribution.inSmallRangePct) / 100))
+            ],
+            [
+                (.dynamicBlue, CGFloat(distribution.highPct / 100)),
+                (.dynamicPurple, CGFloat(distribution.veryHighPct / 100))
+            ]
+        ] : [[(Color.secondary.opacity(0.3), 1)]]
 
         Button {
             state.showModal(for: .statistics)
@@ -584,7 +597,7 @@ extension Home.RootView {
                                 .minimumScaleFactor(0.8)
                             }
 
-                            statsDistributionBar(segments)
+                            statsDistributionBar(groups)
                                 .frame(height: 6)
                         }
                     case .distributionBar:
@@ -599,7 +612,7 @@ extension Home.RootView {
                             .lineLimit(1)
                             .minimumScaleFactor(0.8)
 
-                            statsDistributionBar(segments)
+                            statsDistributionBar(groups)
                                 .frame(height: 6)
                         }
                     case .averages:
