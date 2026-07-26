@@ -552,10 +552,12 @@ extension Home.RootView {
             ? distribution.inRangePct.formatted(.number.precision(.fractionLength(0 ... 1))) + " %"
             : "-- %"
         let segments: [(color: Color, fraction: CGFloat)] = hasData ? [
-            (.red, CGFloat(distribution.veryLowPct / 100)),
-            (.orange, CGFloat(distribution.lowPct / 100)),
-            (.loopGreen, CGFloat(distribution.inRangePct / 100)),
-            (.purple, CGFloat((distribution.highPct + distribution.veryHighPct) / 100))
+            (.dynamicRed, CGFloat(distribution.veryLowPct / 100)),
+            (.dynamicOrange, CGFloat(distribution.lowPct / 100)),
+            (.dynamicGreen, CGFloat(distribution.inSmallRangePct / 100)),
+            (.dynamicTeal, CGFloat((distribution.inRangePct - distribution.inSmallRangePct) / 100)),
+            (.dynamicBlue, CGFloat(distribution.highPct / 100)),
+            (.dynamicPurple, CGFloat(distribution.veryHighPct / 100))
         ] : [(Color.secondary.opacity(0.3), 1)]
 
         Button {
