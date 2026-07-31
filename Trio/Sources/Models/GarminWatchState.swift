@@ -64,6 +64,14 @@ struct GarminWatchState: Hashable, Equatable, Sendable, Encodable {
     /// Options: "tbr" or "eventualBG"
     var displaySecondaryAttributeChoice: String?
 
+    /// Glucose color scheme the watchface should use
+    /// Options: "dynamic" (hue ramp from low through target to high) or "static" (in-range / out-of-range)
+    var glucoseColorScheme: String?
+
+    /// Currently scheduled profile glucose target in raw mg/dL (no unit conversion applied)
+    /// Used as the green midpoint of the dynamic color ramp and drawn as the target line on the graph
+    var targetGlucose: Int16?
+
     static func == (lhs: GarminWatchState, rhs: GarminWatchState) -> Bool {
         lhs.date == rhs.date &&
             lhs.glucoseDate == rhs.glucoseDate &&
@@ -79,7 +87,9 @@ struct GarminWatchState: Hashable, Equatable, Sendable, Encodable {
             lhs.isf == rhs.isf &&
             lhs.sensRatio == rhs.sensRatio &&
             lhs.displayPrimaryAttributeChoice == rhs.displayPrimaryAttributeChoice &&
-            lhs.displaySecondaryAttributeChoice == rhs.displaySecondaryAttributeChoice
+            lhs.displaySecondaryAttributeChoice == rhs.displaySecondaryAttributeChoice &&
+            lhs.glucoseColorScheme == rhs.glucoseColorScheme &&
+            lhs.targetGlucose == rhs.targetGlucose
     }
 
     func hash(into hasher: inout Hasher) {
@@ -98,6 +108,8 @@ struct GarminWatchState: Hashable, Equatable, Sendable, Encodable {
         hasher.combine(sensRatio)
         hasher.combine(displayPrimaryAttributeChoice)
         hasher.combine(displaySecondaryAttributeChoice)
+        hasher.combine(glucoseColorScheme)
+        hasher.combine(targetGlucose)
     }
 
     enum CodingKeys: String, CodingKey {
@@ -116,6 +128,8 @@ struct GarminWatchState: Hashable, Equatable, Sendable, Encodable {
         case sensRatio
         case displayPrimaryAttributeChoice
         case displaySecondaryAttributeChoice
+        case glucoseColorScheme
+        case targetGlucose
     }
 
     /// Custom encoding that excludes nil values from the JSON output
@@ -138,5 +152,7 @@ struct GarminWatchState: Hashable, Equatable, Sendable, Encodable {
         try container.encodeIfPresent(sensRatio?.roundedDouble(toPlaces: 2), forKey: .sensRatio)
         try container.encodeIfPresent(displayPrimaryAttributeChoice, forKey: .displayPrimaryAttributeChoice)
         try container.encodeIfPresent(displaySecondaryAttributeChoice, forKey: .displaySecondaryAttributeChoice)
+        try container.encodeIfPresent(glucoseColorScheme, forKey: .glucoseColorScheme)
+        try container.encodeIfPresent(targetGlucose, forKey: .targetGlucose)
     }
 }
