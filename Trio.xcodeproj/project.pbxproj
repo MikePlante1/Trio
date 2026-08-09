@@ -71,6 +71,9 @@
 		7A11AC0DE000000000000106 /* HomeRootView+Refresh.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A11AC0DE000000000000006 /* HomeRootView+Refresh.swift */; };
 		7A11AC0DE000000000000111 /* HomeLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A11AC0DE000000000000011 /* HomeLayout.swift */; };
 		7A11AC0DE000000000000113 /* MultiUsePanelState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A11AC0DE000000000000013 /* MultiUsePanelState.swift */; };
+		DB0BB002000000000000000C /* ReleaseNotes.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB0BB002000000000000000B /* ReleaseNotes.swift */; };
+		DB0BB002000000000000000E /* ReleaseNotesService.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB0BB002000000000000000D /* ReleaseNotesService.swift */; };
+		DB0BB0020000000000000010 /* ReleaseNotesSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB0BB002000000000000000F /* ReleaseNotesSheetView.swift */; };
 		7A11AC0DE000000000000116 /* GlassChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A11AC0DE000000000000016 /* GlassChrome.swift */; };
 		7A11AC0DE000000000000110 /* HomeRootView+BottomControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A11AC0DE000000000000010 /* HomeRootView+BottomControls.swift */; };
 		7A11AC0DE00000000000010E /* HomeRootView+MealPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A11AC0DE00000000000000E /* HomeRootView+MealPanel.swift */; };
@@ -1132,6 +1135,9 @@
 		7A11AC0DE000000000000006 /* HomeRootView+Refresh.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HomeRootView+Refresh.swift"; sourceTree = "<group>"; };
 		7A11AC0DE000000000000011 /* HomeLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeLayout.swift; sourceTree = "<group>"; };
 		7A11AC0DE000000000000013 /* MultiUsePanelState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MultiUsePanelState.swift; sourceTree = "<group>"; };
+		DB0BB002000000000000000B /* ReleaseNotes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReleaseNotes.swift; sourceTree = "<group>"; };
+		DB0BB002000000000000000D /* ReleaseNotesService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReleaseNotesService.swift; sourceTree = "<group>"; };
+		DB0BB002000000000000000F /* ReleaseNotesSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReleaseNotesSheetView.swift; sourceTree = "<group>"; };
 		7A11AC0DE000000000000016 /* GlassChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassChrome.swift; sourceTree = "<group>"; };
 		7A11AC0DE000000000000010 /* HomeRootView+BottomControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HomeRootView+BottomControls.swift"; sourceTree = "<group>"; };
 		7A11AC0DE00000000000000E /* HomeRootView+MealPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HomeRootView+MealPanel.swift"; sourceTree = "<group>"; };
@@ -2465,6 +2471,7 @@
 				7A11AC0DE000000000000006 /* HomeRootView+Refresh.swift */,
 				7A11AC0DE000000000000011 /* HomeLayout.swift */,
 				7A11AC0DE000000000000013 /* MultiUsePanelState.swift */,
+				DB0BB002000000000000000F /* ReleaseNotesSheetView.swift */,
 				7A11AC0DE000000000000016 /* GlassChrome.swift */,
 				7A11AC0DE000000000000010 /* HomeRootView+BottomControls.swift */,
 				7A11AC0DE00000000000000E /* HomeRootView+MealPanel.swift */,
@@ -2511,6 +2518,7 @@
 				3862CC2C2743F9DC00BF832C /* Calendar */,
 				E592A37E2CEEC046009A472C /* ContactImage */,
 				DB0BA0010000000000000001 /* DevelopmentBranchAlerter */,
+				DB0BB002000000000000000A /* ReleaseNotes */,
 				F90692A8274B7A980037068D /* HealthKit */,
 				3B506FD72E6352E9000740B9 /* IOB */,
 				6B1A8D2C2B156EC100E76752 /* LiveActivity */,
@@ -4378,6 +4386,15 @@
 			path = DevelopmentBranchAlerter;
 			sourceTree = "<group>";
 		};
+		DB0BB002000000000000000A /* ReleaseNotes */ = {
+			isa = PBXGroup;
+			children = (
+				DB0BB002000000000000000B /* ReleaseNotes.swift */,
+				DB0BB002000000000000000D /* ReleaseNotesService.swift */,
+			);
+			path = ReleaseNotes;
+			sourceTree = "<group>";
+		};
 		DDA9AC072D67291600E6F1A9 /* AppVersionChecker */ = {
 			isa = PBXGroup;
 			children = (
@@ -4688,6 +4705,7 @@
 				38E8753D27554D5900975559 /* Embed Watch Content */,
 				6B1A8D122B14D88E00E76752 /* Embed Foundation Extensions */,
 				DD88C8DF2C4D583900F2D558 /* Run Script: Capture Build Details */,
+				DB0BB0020000000000000011 /* Run Script: Capture Release Notes */,
 				3B47C6112DA0A52C00B0E5EF /* Run Script: Copy dSYM to Crashlytics */,
 			);
 			buildRules = (
@@ -5019,6 +5037,25 @@
 			shellPath = /bin/sh;
 			shellScript = "if [ \"$CI\" = \"true\" ]; then echo \"CI detected - skipping Crashlytics dSYM upload.\"; exit 0; fi\n# Type a script or drag a script file from your workspace to insert its path.\n\"${BUILD_DIR%/Build/*}/SourcePackages/checkouts/firebase-ios-sdk/Crashlytics/run\"\n";
 		};
+		DB0BB0020000000000000011 /* Run Script: Capture Release Notes */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Run Script: Capture Release Notes";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${SRCROOT}/scripts/capture-release-notes.sh\"\n";
+		};
 		DD88C8DF2C4D583900F2D558 /* Run Script: Capture Build Details */ = {
 			isa = PBXShellScriptBuildPhase;
 			alwaysOutOfDate = 1;
@@ -5305,6 +5342,9 @@
 				7A11AC0DE000000000000106 /* HomeRootView+Refresh.swift in Sources */,
 				7A11AC0DE000000000000111 /* HomeLayout.swift in Sources */,
 				7A11AC0DE000000000000113 /* MultiUsePanelState.swift in Sources */,
+				DB0BB002000000000000000C /* ReleaseNotes.swift in Sources */,
+				DB0BB002000000000000000E /* ReleaseNotesService.swift in Sources */,
+				DB0BB0020000000000000010 /* ReleaseNotesSheetView.swift in Sources */,
 				7A11AC0DE000000000000116 /* GlassChrome.swift in Sources */,
 				7A11AC0DE000000000000110 /* HomeRootView+BottomControls.swift in Sources */,
 				7A11AC0DE00000000000010E /* HomeRootView+MealPanel.swift in Sources */,

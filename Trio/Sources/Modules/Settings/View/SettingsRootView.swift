@@ -36,6 +36,8 @@ extension Settings {
         )
         @State private var closedLoopDisabled = true
         @State private var showCopiedToast = false
+        @State private var showReleaseNotes = false
+        @ObservedObject private var releaseNotesService = ReleaseNotesService.shared
 
         @Environment(\.colorScheme) var colorScheme
         @EnvironmentObject var appIcons: Icons
@@ -289,6 +291,30 @@ extension Settings {
                         }
                     ).listRowBackground(Color.chart)
 
+                    if let notes = releaseNotesService.notes {
+                        Section(
+                            header: Text("Latest Release"),
+                            content: {
+                                Button {
+                                    showReleaseNotes = true
+                                } label: {
+                                    HStack {
+                                        Text(
+                                            "What's new? v\(notes.version)",
+                                            comment: "Settings row opening the release notes; the placeholder is a version number"
+                                        )
+                                        .foregroundColor(.primary)
+                                        Spacer()
+                                        Image(systemName: "chevron.right")
+                                            .foregroundColor(.secondary)
+                                            .font(.footnote)
+                                    }
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                        ).listRowBackground(Color.chart)
+                    }
+
                     Section(
                         header: Text("Trio Backup"),
                         content: {
@@ -356,7 +382,17 @@ extension Settings {
             .sheet(isPresented: $showShareSheet) {
                 ShareSheet(activityItems: state.logItems())
             }
+            .sheet(isPresented: $showReleaseNotes) {
+                if let notes = releaseNotesService.notes {
+                    // Opening from Settings deliberately does not acknowledge: the Home panel is
+                    // dismissed by reading the notes there, not by browsing them later.
+                    ReleaseNotesSheetView(notes: notes) {}
+                }
+            }
             .onAppear(perform: configureView)
+            .task {
+                await releaseNotesService.load()
+            }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.automatic)
             .toolbar {
