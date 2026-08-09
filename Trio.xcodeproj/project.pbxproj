@@ -312,6 +312,8 @@
 		3BD6CE262DC24CFD00FA0472 /* pumphistory-24h-zoned.json in Resources */ = {isa = PBXBuildFile; fileRef = 3BD6CE252DC24CFD00FA0472 /* pumphistory-24h-zoned.json */; };
 		3BD9687C2D8DDD4600899469 /* SlideButton in Frameworks */ = {isa = PBXBuildFile; productRef = 3BD9687B2D8DDD4600899469 /* SlideButton */; };
 		3BD9687F2D8DDD8800899469 /* CryptoSwift in Frameworks */ = {isa = PBXBuildFile; productRef = 3BD9687E2D8DDD8800899469 /* CryptoSwift */; };
+		3EA5210000000000000000A1 /* ASN1 in Frameworks */ = {isa = PBXBuildFile; productRef = 3EA5210000000000000000A2 /* ASN1 */; };
+		3EA5210000000000000000B1 /* BigInt in Frameworks */ = {isa = PBXBuildFile; productRef = 3EA5210000000000000000B2 /* BigInt */; };
 		3BE2F1E82E030E2F009E2900 /* MealCobTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BE2F1E72E030E2F009E2900 /* MealCobTests.swift */; };
 		3BE2F1EA2E031951009E2900 /* MealCobBucketingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BE2F1E92E031951009E2900 /* MealCobBucketingTests.swift */; };
 		3BEDC9932EEB27B600AC6492 /* IobConsecutiveEventsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BEDC9922EEB27B600AC6492 /* IobConsecutiveEventsTests.swift */; };
@@ -2026,6 +2028,8 @@
 				CE95BF5F2BA7715800DC3DE3 /* MockKit.framework in Frameworks */,
 				DD17A0292E3FE0BD008E1BF0 /* SwiftJWT in Frameworks */,
 				3BD9687F2D8DDD8800899469 /* CryptoSwift in Frameworks */,
+				3EA5210000000000000000A1 /* ASN1 in Frameworks */,
+				3EA5210000000000000000B1 /* BigInt in Frameworks */,
 				3B4BA7842D8DBD690069D5B8 /* RileyLinkKit.framework in Frameworks */,
 				CE95BF612BA7715900DC3DE3 /* MockKitUI.framework in Frameworks */,
 				E0CC2C5C275B9F0F00A7BC71 /* HealthKit.framework in Frameworks */,
@@ -4679,6 +4683,8 @@
 				B958F1B62BA0711600484851 /* MKRingProgressView */,
 				3BD9687B2D8DDD4600899469 /* SlideButton */,
 				3BD9687E2D8DDD8800899469 /* CryptoSwift */,
+				3EA5210000000000000000A2 /* ASN1 */,
+				3EA5210000000000000000B2 /* BigInt */,
 				3B47C60F2DA0A28F00B0E5EF /* FirebaseCrashlytics */,
 				DD17A0282E3FE0BD008E1BF0 /* SwiftJWT */,
 				3E28F2AA2EB5337F00FB9EEB /* ConnectIQ */,
@@ -4856,6 +4862,8 @@
 				B958F1B52BA0711600484851 /* XCRemoteSwiftPackageReference "MKRingProgressView" */,
 				3BD9687A2D8DDD4600899469 /* XCRemoteSwiftPackageReference "SlideButton" */,
 				3BD9687D2D8DDD8800899469 /* XCRemoteSwiftPackageReference "CryptoSwift" */,
+				3EA5210000000000000000A3 /* XCRemoteSwiftPackageReference "ASN1" */,
+				3EA5210000000000000000B3 /* XCRemoteSwiftPackageReference "BigInt" */,
 				3B47C60E2DA0A28F00B0E5EF /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
 				DD868FD92E381E1C005D3308 /* XCRemoteSwiftPackageReference "Swift-JWT" */,
 				3E28F2A92EB5337F00FB9EEB /* XCRemoteSwiftPackageReference "connectiq-companion-app-sdk-ios" */,
@@ -6599,6 +6607,22 @@
 				version = 4.0.1;
 			};
 		};
+		3EA5210000000000000000A3 /* XCRemoteSwiftPackageReference "ASN1" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/leif-ibsen/ASN1";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.7.0;
+			};
+		};
+		3EA5210000000000000000B3 /* XCRemoteSwiftPackageReference "BigInt" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/leif-ibsen/BigInt";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.22.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -6651,6 +6675,16 @@
 			isa = XCSwiftPackageProductDependency;
 			package = DD868FD92E381E1C005D3308 /* XCRemoteSwiftPackageReference "Swift-JWT" */;
 			productName = SwiftJWT;
+		};
+		3EA5210000000000000000A2 /* ASN1 */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 3EA5210000000000000000A3 /* XCRemoteSwiftPackageReference "ASN1" */;
+			productName = ASN1;
+		};
+		3EA5210000000000000000B2 /* BigInt */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 3EA5210000000000000000B3 /* XCRemoteSwiftPackageReference "BigInt" */;
+			productName = BigInt;
 		};
 /* End XCSwiftPackageProductDependency section */
 
