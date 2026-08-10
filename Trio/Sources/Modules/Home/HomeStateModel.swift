@@ -478,10 +478,6 @@ extension Home {
                     self.iobProjection = self.iobService.iobProjection.compactMap { entry in
                         entry.time.map { ProjectionPoint(date: $0, value: NSDecimalNumber(decimal: entry.iob).doubleValue) }
                     }
-                    self.cobProjection = (self.fileStorage.retrieve(OpenAPS.Monitor.cob, as: [CobEntry].self) ?? [])
-                        .compactMap { entry in
-                            entry.time.map { ProjectionPoint(date: $0, value: NSDecimalNumber(decimal: entry.cob).doubleValue) }
-                        }
                 }
                 .store(in: &subscriptions)
 
