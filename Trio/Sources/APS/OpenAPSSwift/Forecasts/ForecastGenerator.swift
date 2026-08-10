@@ -32,6 +32,15 @@ enum ForecastGenerator {
         }
 
         let carbSensitivityFactor = adjustedSensitivity / adjustedCarbRatio
+
+        // Mirror MealCob's min_5m_carbimpact floor (raw profile ISF/CR at loop time) so
+        // the COB projection tracks the COB readout instead of drifting above it
+        let profileSensitivity = profile.sens ?? profile.sensitivityFor(time: currentTime)
+        let profileCarbSensitivityFactor = profileCarbRatio > 0 ? profileSensitivity / profileCarbRatio : 0
+        let minAbsorbedCarbsPerStep = profileCarbSensitivityFactor > 0
+            ? profile.min5mCarbImpact / profileCarbSensitivityFactor
+            : 0
+
         let minDelta = min(glucoseStatus.delta, glucoseStatus.shortAvgDelta)
         // this carbImpact is `ci` in JS
         var carbImpact = (minDelta - currentGlucoseImpact).jsRounded(scale: 1)
@@ -71,7 +80,8 @@ enum ForecastGenerator {
             carbImpact: carbImpact,
             carbImpactParams: carbImpactParams,
             mealCOB: mealData.mealCOB,
-            carbSensitivityFactor: carbSensitivityFactor
+            carbSensitivityFactor: carbSensitivityFactor,
+            minAbsorbedCarbsPerStep: minAbsorbedCarbsPerStep
         )
 
         let uamResult = forecastUAM(

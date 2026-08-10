@@ -50,14 +50,15 @@ extension ForecastGenerator {
         carbImpact: Decimal,
         carbImpactParams: CarbImpactParams,
         mealCOB: Decimal,
-        carbSensitivityFactor: Decimal
+        carbSensitivityFactor: Decimal,
+        minAbsorbedCarbsPerStep: Decimal
     ) -> IndividualForecast {
         // Start with the current BG
         var result = [startingGlucose]
         var rawResult = [startingGlucose]
 
-        // Remaining COB per step, derived from the same carb-impact terms that
-        // bend the forecast; display-only, never fed back into the algorithm
+        // Remaining COB per step: the forecast's carb-impact terms, floored at the rate
+        // MealCob retires carbs; display-only, never fed back into the algorithm
         var remainingCob = mealCOB
         var cobSeries = [mealCOB]
 
@@ -90,10 +91,11 @@ extension ForecastGenerator {
                 + forecastedCarbImpact
                 + triangle
 
-            // grams absorbed this step = carb impact of this step / CSF
+            // grams absorbed this step = carb impact of this step / CSF, never less
+            // than the floor MealCob applies when it decrements the real COB
             let absorbedCarbs = carbSensitivityFactor > 0
-                ? (forecastedCarbImpact + triangle) / carbSensitivityFactor
-                : 0
+                ? max((forecastedCarbImpact + triangle) / carbSensitivityFactor, minAbsorbedCarbsPerStep)
+                : minAbsorbedCarbsPerStep
             remainingCob = max(0, remainingCob - absorbedCarbs)
 
             if result.count < 48 {
