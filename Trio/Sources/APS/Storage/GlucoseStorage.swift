@@ -7,14 +7,22 @@ import SwiftDate
 import SwiftUI
 import Swinject
 
+/// Minimum spacing enforced between stored CGM readings at ingestion.
+enum GlucoseDeduplicationInterval {
+    static let standard: TimeInterval = 3.5 * 60
+    /// For CGMs that intentionally stream a reading every minute
+    /// (LibreLoop's experimental mode).
+    static let minuteCadence: TimeInterval = 30
+}
+
 protocol GlucoseStorage {
     var updatePublisher: AnyPublisher<Void, Never> { get }
     func storeGlucose(_ glucose: [BloodGlucose]) async throws
-    func backfillGlucose(_ glucose: [BloodGlucose]) async throws
+    func backfillGlucose(_ glucose: [BloodGlucose], deduplicationInterval: TimeInterval) async throws
     func addManualGlucose(glucose: Int)
     func isGlucoseDataFresh(_ glucoseDate: Date?) -> Bool
     func syncDate() -> Date
-    func filterTooFrequentGlucose(_ glucose: [BloodGlucose], at: Date) -> [BloodGlucose]
+    func filterTooFrequentGlucose(_ glucose: [BloodGlucose], at: Date, minimumInterval: TimeInterval) -> [BloodGlucose]
     func lastGlucoseDate() -> Date?
     func isGlucoseFresh() -> Bool
     func getGlucoseForAlgorithm(shouldSmoothGlucose: Bool, fetchHours: Decimal) async throws -> [BloodGlucose]
@@ -27,6 +35,16 @@ protocol GlucoseStorage {
 //    func getGlucoseStatus() async throws -> GlucoseStatus? // FIXME: prepared for later use
     var alarm: GlucoseAlarm? { get }
     func deleteGlucose(_ treatmentObjectID: NSManagedObjectID) async
+}
+
+extension GlucoseStorage {
+    func backfillGlucose(_ glucose: [BloodGlucose]) async throws {
+        try await backfillGlucose(glucose, deduplicationInterval: GlucoseDeduplicationInterval.standard)
+    }
+
+    func filterTooFrequentGlucose(_ glucose: [BloodGlucose], at date: Date) -> [BloodGlucose] {
+        filterTooFrequentGlucose(glucose, at: date, minimumInterval: GlucoseDeduplicationInterval.standard)
+    }
 }
 
 final class BaseGlucoseStorage: GlucoseStorage, Injectable {
@@ -75,9 +93,10 @@ final class BaseGlucoseStorage: GlucoseStorage, Injectable {
     ///  the most challenging and most rare since it would happen if wearing two devices and
     ///  switching or moving from direct glucose handling to xdrip. It's not worth the complexity
     ///  to deal with source switching perfectly, so instead we will backfill glucose if and only if
-    ///  it isn't within 3.5 minutes of an existing glucose reading, which is simple but not perfect.
+    ///  it isn't within `deduplicationInterval` (normally 3.5 minutes; shorter for minute-by-minute
+    ///  CGMs) of an existing glucose reading, which is simple but not perfect.
     ///  But since this is a corner case that really shouldn't happen often, it's good enough.
-    func backfillGlucose(_ glucose: [BloodGlucose]) async throws {
+    func backfillGlucose(_ glucose: [BloodGlucose], deduplicationInterval: TimeInterval) async throws {
         let context = makeContext()
         context.name = "backfillGlucose"
         let clamped = clampToMinimum(glucose)
@@ -91,11 +110,11 @@ final class BaseGlucoseStorage: GlucoseStorage, Injectable {
                 context: context
             )
 
-            // check for a 3.5 minute difference between existing values
+            // check for a deduplicationInterval difference between existing values
             let filteredGlucose = self.filterGlucoseValues(
                 withoutDeletedGlucose,
                 fetchRequest: GlucoseStored.fetchRequest(),
-                timeBuffer: 3.5 * 60,
+                timeBuffer: deduplicationInterval,
                 context: context
             )
 
@@ -416,13 +435,13 @@ final class BaseGlucoseStorage: GlucoseStorage, Injectable {
         Date().timeIntervalSince(lastGlucoseDate() ?? .distantPast) <= Config.filterTime
     }
 
-    func filterTooFrequentGlucose(_ glucose: [BloodGlucose], at date: Date) -> [BloodGlucose] {
+    func filterTooFrequentGlucose(_ glucose: [BloodGlucose], at date: Date, minimumInterval: TimeInterval) -> [BloodGlucose] {
         var lastDate = date
         var filtered: [BloodGlucose] = []
         let sorted = glucose.sorted { $0.date < $1.date }
 
         for entry in sorted {
-            guard entry.dateString.addingTimeInterval(-Config.filterTime) > lastDate else {
+            guard entry.dateString.addingTimeInterval(-minimumInterval) > lastDate else {
                 continue
             }
             filtered.append(entry)

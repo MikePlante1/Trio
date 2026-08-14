@@ -2,6 +2,7 @@ import Combine
 import CoreData
 import Foundation
 import HealthKit
+import LibreLoop
 import LoopKit
 import LoopKitUI
 import SwiftDate
@@ -65,6 +66,12 @@ final class BaseFetchGlucoseManager: FetchGlucoseManager, Injectable {
 
     /// Enforce mutual exclusion on calls to glucoseStoreAndHeartDecision
     private let glucoseStoreAndHeartLock = DispatchSemaphore(value: 1)
+
+    /// True when the active CGM plugin intentionally forwards a reading every
+    /// minute (LibreLoop's experimental minute-by-minute mode).
+    private var cgmDeliversMinuteReadings: Bool {
+        (cgmManager as? LibreLoopCGMManager)?.state.experimentalMinuteByMinuteForwarding == true
+    }
 
     var shouldSyncToRemoteService: Bool {
         guard let cgmManager = cgmManager else {
@@ -285,18 +292,23 @@ final class BaseFetchGlucoseManager: FetchGlucoseManager, Injectable {
             return
         }
 
+        let minuteCGMActive = cgmDeliversMinuteReadings
+        let deduplicationInterval = minuteCGMActive
+            ? GlucoseDeduplicationInterval.minuteCadence
+            : GlucoseDeduplicationInterval.standard
+
         let backfillGlucose = newGlucose.filter { $0.dateString <= syncDate }
         if backfillGlucose.isNotEmpty {
             debug(.deviceManager, "Backfilling glucose...")
             do {
-                try await glucoseStorage.backfillGlucose(backfillGlucose)
+                try await glucoseStorage.backfillGlucose(backfillGlucose, deduplicationInterval: deduplicationInterval)
             } catch {
                 debug(.deviceManager, "Unable to backfill glucose: \(error)")
             }
         }
 
         filteredByDate = newGlucose.filter { $0.dateString > syncDate }
-        filtered = glucoseStorage.filterTooFrequentGlucose(filteredByDate, at: syncDate)
+        filtered = glucoseStorage.filterTooFrequentGlucose(filteredByDate, at: syncDate, minimumInterval: deduplicationInterval)
 
         guard filtered.isNotEmpty else {
             endBackgroundTaskSafely(&backgroundTaskID, taskName: "Glucose Store and Heartbeat Decision")
@@ -420,12 +432,18 @@ extension BaseFetchGlucoseManager {
             // Predicate must cover at least the full glucose horizon used by downstream algorithm consumers.
             // If autosens / oref / smoothing logic ever starts looking back further (e.g. 36h),
             // this fetch window must be expanded accordingly.
-            // Fetch descending (newest first) so the limit always keeps the most recent 350 readings.
+            // Fetch descending (newest first) so the limit always keeps the most recent readings.
             // Reversed before return so callers receive oldest-first (chronological) order.
             predicate: compoundPredicate,
             key: "date",
             ascending: false,
-            fetchLimit: 350
+            // The limit is a row count standing in for a time span: 350 rows is ~29 h at the
+            // 5-minute cadence it was sized for, comfortably covering autosens' 24 h. Minute-by-
+            // minute data stores ~5x the rows for the same span, so the count is scaled to keep
+            // the same horizon — otherwise 350 rows would reach back only ~5.8 h and every
+            // reading older than that would keep a nil smoothedGlucose, leaving autosens with a
+            // series that is smoothed at the head and raw at the tail.
+            fetchLimit: cgmDeliversMinuteReadings ? 350 * 5 : 350
         )
 
         guard let glucoseArray = results as? [GlucoseStored] else {
@@ -433,48 +451,6 @@ extension BaseFetchGlucoseManager {
         }
 
         return Array(glucoseArray.map(\.objectID).reversed())
-    }
-
-    /// CoreData-friendly AAPS exponential smoothing + storage.
-    /// - Important: Only stores `smoothedGlucose`. UI/alerts should still use `glucose`.
-    ///
-    func exponentialSmoothingGlucose(context: NSManagedObjectContext) async {
-        let startTime = Date()
-
-        do {
-            // get objectIDs
-            let objectIDs = try await fetchGlucose(context: context)
-
-            try await context.perform {
-                // Load managed objects from object IDs
-                // Filtering (isManual, date) already done at DB level in fetchGlucose
-                let glucoseReadings = objectIDs.compactMap {
-                    context.object(with: $0) as? GlucoseStored
-                }
-
-                guard !glucoseReadings.isEmpty else { return }
-
-                // Static method call to avoid self-capture
-                Self.applyExponentialSmoothingAndStore(
-                    glucoseReadings: glucoseReadings,
-                    minimumWindowSize: 4,
-                    maximumAllowedGapMinutes: 12,
-                    xDripErrorGlucose: 38,
-                    minimumSmoothedGlucose: 39,
-                    firstOrderWeight: 0.4,
-                    firstOrderAlpha: 0.5,
-                    secondOrderAlpha: 0.4,
-                    secondOrderBeta: 1.0
-                )
-
-                try context.save()
-            }
-
-            let duration = Date().timeIntervalSince(startTime)
-            debugPrint(String(format: "Exponential smoothing duration: %0.04fs", duration))
-        } catch {
-            debug(.deviceManager, "Failed to smooth glucose: \(error)")
-        }
     }
 
     private static func applyExponentialSmoothingAndStore(
@@ -592,6 +568,48 @@ extension BaseFetchGlucoseManager {
             let rounded = blendedValue.rounded(toPlaces: 0) // nearest integer, ties away from zero
             let clamped = max(rounded, minimumSmoothedGlucose)
             object.smoothedGlucose = clamped as NSDecimalNumber
+        }
+    }
+
+    /// CoreData-friendly AAPS exponential smoothing + storage.
+    /// - Important: Only stores `smoothedGlucose`. UI/alerts should still use `glucose`.
+    ///
+    func exponentialSmoothingGlucose(context: NSManagedObjectContext) async {
+        let startTime = Date()
+
+        do {
+            // get objectIDs
+            let objectIDs = try await fetchGlucose(context: context)
+
+            try await context.perform {
+                // Load managed objects from object IDs
+                // Filtering (isManual, date) already done at DB level in fetchGlucose
+                let glucoseReadings = objectIDs.compactMap {
+                    context.object(with: $0) as? GlucoseStored
+                }
+
+                guard !glucoseReadings.isEmpty else { return }
+
+                // Static method call to avoid self-capture
+                Self.applyExponentialSmoothingAndStore(
+                    glucoseReadings: glucoseReadings,
+                    minimumWindowSize: 4,
+                    maximumAllowedGapMinutes: 12,
+                    xDripErrorGlucose: 38,
+                    minimumSmoothedGlucose: 39,
+                    firstOrderWeight: 0.4,
+                    firstOrderAlpha: 0.5,
+                    secondOrderAlpha: 0.4,
+                    secondOrderBeta: 1.0
+                )
+
+                try context.save()
+            }
+
+            let duration = Date().timeIntervalSince(startTime)
+            debugPrint(String(format: "Exponential smoothing duration: %0.04fs", duration))
+        } catch {
+            debug(.deviceManager, "Failed to smooth glucose: \(error)")
         }
     }
 }
