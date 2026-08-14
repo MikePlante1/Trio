@@ -67,6 +67,10 @@ final class BaseFetchGlucoseManager: FetchGlucoseManager, Injectable {
     /// Enforce mutual exclusion on calls to glucoseStoreAndHeartDecision
     private let glucoseStoreAndHeartLock = DispatchSemaphore(value: 1)
 
+    /// Newest stored reading that last triggered a pump heartbeat; only
+    /// consulted in minute-by-minute CGM mode.
+    private var lastHeartbeatGlucoseDate: Date = .distantPast
+
     /// True when the active CGM plugin intentionally forwards a reading every
     /// minute (LibreLoop's experimental minute-by-minute mode).
     private var cgmDeliversMinuteReadings: Bool {
@@ -324,13 +328,25 @@ final class BaseFetchGlucoseManager: FetchGlucoseManager, Injectable {
             await exponentialSmoothingGlucose(context: smoothingContext)
         }
 
-        // Push the fresh reading schedule so the pump can align its BLE heartbeat
-        deviceDataManager.updatePumpBLEHeartbeat(
-            lastCGMReadingDate: filtered.map(\.dateString).max(),
-            expectedCGMReadingInterval: cgmManager?.expectedGlucoseSampleInterval
-        )
+        // In minute-by-minute mode a heartbeat (and thus a loop) per reading
+        // would race Config.loopInterval; pace it to the same 5-minute comb
+        // the algorithm consumes.
+        let newestReadingDate = filtered.map(\.dateString).max() ?? Date()
+        if !minuteCGMActive
+            || newestReadingDate.timeIntervalSince(lastHeartbeatGlucoseDate) >= FiveMinuteCadence.minimumSpacing
+        {
+            lastHeartbeatGlucoseDate = newestReadingDate
 
-        deviceDataManager.heartbeat(date: Date())
+            // Push the fresh reading schedule so the pump can align its BLE heartbeat
+            deviceDataManager.updatePumpBLEHeartbeat(
+                lastCGMReadingDate: newestReadingDate,
+                expectedCGMReadingInterval: cgmManager?.expectedGlucoseSampleInterval
+            )
+
+            deviceDataManager.heartbeat(date: Date())
+        } else {
+            debug(.deviceManager, "Skipping heartbeat for sub-cadence reading (minute-by-minute CGM mode)")
+        }
 
         endBackgroundTaskSafely(&backgroundTaskID, taskName: "Glucose Store and Heartbeat Decision")
     }
