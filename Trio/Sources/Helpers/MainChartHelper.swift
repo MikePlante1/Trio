@@ -75,6 +75,17 @@ enum MainChartHelper {
         /// Width (pt) of the strips at the viewport edges where a scrubbing finger makes
         /// the chart auto-pan to reveal more data; pan speed scales with edge depth.
         static let edgePanZoneWidth: CGFloat = 44
+        /// How far (s) the scrubbing finger may sit from a glucose reading and still select it.
+        /// Selection snaps to the *nearest* reading within this reach, so the popover follows
+        /// the sensor's own cadence — a 1-minute feed resolves reading by reading — rather than
+        /// a fixed 5-minute grid. Kept at 300 s because that was the old grid snap's effective
+        /// reach: at the widest zoom one pixel spans several minutes, and a tighter reach would
+        /// blank the popover between 5-minute readings mid-scrub.
+        static let glucoseSelectionReach: TimeInterval = 300
+        /// Half-width (s) of the window matching a COB/IOB determination to the selection.
+        /// Determinations run on the ~5-minute loop cycle, so this stays tight — widening it
+        /// would let the card show a determination minutes away from the selected reading.
+        static let determinationSelectionWindow: TimeInterval = 150
         /// How long (s) a one-finger touch must rest before the inspect popover appears.
         /// Without this, every drag briefly triggered inspect on touch-down — and each
         /// selection change re-lays the canvas, stalling the pan as it starts.

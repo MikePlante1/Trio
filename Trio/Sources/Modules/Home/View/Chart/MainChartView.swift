@@ -273,8 +273,27 @@ extension MainChartView {
 extension MainChartView {
     var selectedGlucose: GlucoseStored? {
         guard let selection = selection else { return nil }
-        let range = selection.addingTimeInterval(-150) ... selection.addingTimeInterval(150)
-        return state.glucoseFromPersistence.first { $0.date.map(range.contains) ?? false }
+        return nearestGlucose(to: selection)
+    }
+
+    /// Nearest glucose reading to `target` within the selection reach, or `nil`.
+    /// Cadence-agnostic: a 1-minute feed resolves reading by reading, a 5-minute feed behaves
+    /// as it always did. Picking the *nearest* is what makes that work — several readings fall
+    /// inside the reach at 1-minute cadence, and the first one can sit minutes off the finger.
+    func nearestGlucose(to target: Date) -> GlucoseStored? {
+        let tolerance = MainChartHelper.Config.glucoseSelectionReach
+        let floorDate = target.addingTimeInterval(-tolerance)
+        var best: (reading: GlucoseStored, delta: TimeInterval)?
+        // readings are stored oldest-first; scanning back from the newest lets the common case
+        // (inspecting recent data) stop after a few entries instead of walking the whole window
+        for reading in state.glucoseFromPersistence.reversed() {
+            guard let date = reading.date else { continue }
+            if date < floorDate { break }
+            let delta = abs(date.timeIntervalSince(target))
+            guard delta <= tolerance, delta < (best?.delta ?? .infinity) else { continue }
+            best = (reading, delta)
+        }
+        return best?.reading
     }
 
     private func findDetermination(in range: ClosedRange<Date>) -> OrefDetermination? {
@@ -286,14 +305,17 @@ extension MainChartView {
 
     var selectedCOBValue: OrefDetermination? {
         guard let selection = selection else { return nil }
-        let range = selection.addingTimeInterval(-150) ... selection.addingTimeInterval(150)
-        return findDetermination(in: range)
+        return findDetermination(in: selectionWindow(around: selection))
     }
 
     var selectedIOBValue: OrefDetermination? {
         guard let selection = selection else { return nil }
-        let range = selection.addingTimeInterval(-150) ... selection.addingTimeInterval(150)
-        return findDetermination(in: range)
+        return findDetermination(in: selectionWindow(around: selection))
+    }
+
+    private func selectionWindow(around date: Date) -> ClosedRange<Date> {
+        let tolerance = MainChartHelper.Config.determinationSelectionWindow
+        return date.addingTimeInterval(-tolerance) ... date.addingTimeInterval(tolerance)
     }
 }
 
@@ -581,29 +603,23 @@ extension MainChartView {
         }
     }
 
-    /// Snaps a viewport x position to the 5-minute glucose cadence and updates the
-    /// selection, skipping no-op writes. The popover lookup window is +/-150 s, so the
-    /// 300 s snap lands exactly on the nearest reading; it also means finger jitter or a
-    /// scrub only produces a new value when actually crossing to another reading.
+    /// Snaps a viewport x position to the nearest glucose reading and updates the selection,
+    /// skipping no-op writes. Snapping to the readings themselves rather than to a fixed
+    /// 5-minute grid keeps the popover on the sensor's own cadence — a 1-minute feed is
+    /// scrubbed reading by reading — while still meaning finger jitter or a scrub only
+    /// produces a new value when actually crossing to another reading. With nothing inside the
+    /// matching window (forecast region, sensor gap) the selection clears, which is what the
+    /// popover showed there anyway.
     private func updateSelection(atViewportX x: CGFloat, withPointHaptic: Bool = true) {
-        let raw = date(atViewportX: x)
-        let quantum: TimeInterval = 300
-        let snapped = Date(
-            timeIntervalSince1970: (raw.timeIntervalSince1970 / quantum).rounded() * quantum
-        )
+        let reading = nearestGlucose(to: date(atViewportX: x))
+        let snapped = reading?.date
         guard selection != snapped else { return }
         selection = snapped
         // A featherlight tick whenever the scrub lands on an actual glucose reading.
-        if withPointHaptic, hasGlucoseReading(near: snapped) {
+        if withPointHaptic, snapped != nil {
             scrubPointHaptic.selectionChanged()
             scrubPointHaptic.prepare()
         }
-    }
-
-    /// Whether a glucose reading exists within the selection matching window of `date`.
-    private func hasGlucoseReading(near date: Date) -> Bool {
-        let range = date.addingTimeInterval(-150) ... date.addingTimeInterval(150)
-        return state.glucoseFromPersistence.contains { $0.date.map(range.contains) ?? false }
     }
 
     /// While scrubbing, a finger resting in the viewport's edge zones auto-pans the chart
