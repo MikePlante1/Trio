@@ -79,6 +79,9 @@ extension Stat.StateModel {
 
         let stats = await taskContext.perform {
             // Convert IDs to GlucoseStored objects using the context
+            // Thinned to the 5-minute comb (no-op for standard sources): the hourly percentile
+            // buckets below are count-weighted, so a minute-cadence stretch would otherwise
+            // contribute five times the samples of an equal span at 5-minute cadence.
             let readings = ids.compactMap { id -> GlucoseStored? in
                 do {
                     return try taskContext.existingObject(with: id) as? GlucoseStored
@@ -86,7 +89,7 @@ extension Stat.StateModel {
                     debugPrint("\(DebuggingIdentifiers.failed) Error fetching glucose: \(error)")
                     return nil
                 }
-            }
+            }.thinnedToFiveMinuteCadence()
 
             // Group readings by hour of day (0-23)
             // Example: [8: [reading1, reading2], 9: [reading3, reading4, reading5], ...]

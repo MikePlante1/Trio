@@ -68,6 +68,8 @@ extension Stat.StateModel {
 
         let stats = await taskContext.perform {
             // Convert IDs to GlucoseStored objects using the context
+            // Thinned to the 5-minute comb (no-op for standard sources): the per-hour range
+            // counts below are count-weighted, so mixed cadences would skew the stacked bars.
             let readings = ids.compactMap { id -> GlucoseStored? in
                 do {
                     return try taskContext.existingObject(with: id) as? GlucoseStored
@@ -75,7 +77,7 @@ extension Stat.StateModel {
                     debugPrint("\(DebuggingIdentifiers.failed) Error fetching glucose: \(error)")
                     return nil
                 }
-            }
+            }.thinnedToFiveMinuteCadence()
 
             // Count unique days for each hour
             let daysPerHour = (0 ... 23).map { hour in

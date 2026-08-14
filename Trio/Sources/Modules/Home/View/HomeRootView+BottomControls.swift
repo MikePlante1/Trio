@@ -516,8 +516,12 @@ extension Home.RootView {
     /// Mean glucose (mg/dL) of today's readings, nil without data.
     private var todayMeanGlucose: Double? {
         let startOfDay = Calendar.current.startOfDay(for: Date())
+        // Thinned to the 5-minute comb (no-op for standard sources): this mean feeds the
+        // average and GMI tiles, and a plain sum over readings is only time-proportional
+        // while the stored cadence is uniform.
         let values = state.glucoseFromPersistence
             .filter { ($0.date ?? .distantPast) >= startOfDay }
+            .thinnedToFiveMinuteCadence()
             .map { Double($0.glucose) }
         guard !values.isEmpty else { return nil }
         return values.reduce(0, +) / Double(values.count)

@@ -165,9 +165,15 @@ extension Stat {
 
         @MainActor private func updateGlucoseArray(with IDs: [NSManagedObjectID]) {
             do {
+                // Thin minute-by-minute CGM data to the 5-minute comb (no-op otherwise). Every
+                // statistic here is count-weighted — TIR percentages divide bucket counts by
+                // the total, and the mean behind eA1c/GMI/SD/CV is a plain sum over readings —
+                // which is only equivalent to time-weighting while the stored cadence is
+                // uniform. Without this, an hour spent in minute mode outweighs an hour spent
+                // in 5-minute mode five to one.
                 let glucoseObjects = try IDs.compactMap { id in
                     try viewContext.existingObject(with: id) as? GlucoseStored
-                }
+                }.thinnedToFiveMinuteCadence()
                 glucoseFromPersistence = glucoseObjects
             } catch {
                 debugPrint(
@@ -178,9 +184,10 @@ extension Stat {
 
         @MainActor private func updateAllGlucoseArray(with IDs: [NSManagedObjectID]) {
             do {
+                // Thinned for the same count-weighting reason as updateGlucoseArray above.
                 let glucoseObjects = try IDs.compactMap { id in
                     try viewContext.existingObject(with: id) as? GlucoseStored
-                }
+                }.thinnedToFiveMinuteCadence()
                 glucoseReadings = glucoseObjects
             } catch {
                 debugPrint(
