@@ -4,6 +4,9 @@ import SwiftUI
 
 struct GlucoseChartView: ChartContent {
     let glucoseData: [GlucoseStored]
+    /// Dates of the readings the last oref run consumed; empty when the
+    /// overlay shouldn't draw (standard-cadence sources).
+    let algorithmGlucoseDates: Set<Date>
     let units: GlucoseUnits
     let highGlucose: Decimal
     let lowGlucose: Decimal
@@ -13,6 +16,26 @@ struct GlucoseChartView: ChartContent {
 
     var body: some ChartContent {
         drawGlucoseChart()
+        drawAlgorithmCombDots()
+    }
+
+    /// Small white dot centered on every reading the last algorithm run
+    /// consumed; updates when a loop runs, not per reading.
+    private func drawAlgorithmCombDots() -> some ChartContent {
+        let combReadings = glucoseData.filter { item in
+            guard !item.isManual, let date = item.date else { return false }
+            return algorithmGlucoseDates.contains(date)
+        }
+        return ForEach(combReadings) { item in
+            let glucoseToDisplay = units == .mgdL ? Decimal(item.glucose) : Decimal(item.glucose).asMmolL
+            PointMark(
+                x: .value("Time", item.date ?? Date(), unit: .second),
+                y: .value("Value", glucoseToDisplay)
+            )
+            .foregroundStyle(.white)
+            .symbolSize(8)
+            .symbol(.circle)
+        }
     }
 
     /// Dynamic point color for a CGM reading. Manual readings render red and skip this.
@@ -88,6 +111,7 @@ struct GlucoseChartView: ChartContent {
                             Chart {
                                 GlucoseChartView(
                                     glucoseData: glucoseData,
+                                    algorithmGlucoseDates: [],
                                     units: .mgdL,
                                     highGlucose: 180,
                                     lowGlucose: 70,

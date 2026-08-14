@@ -97,6 +97,9 @@ extension Home {
         var waitForSuggestion: Bool = false
         var glucoseFromPersistence: [GlucoseStored] = []
         var latestTwoGlucoseValues: [GlucoseStored] = []
+        /// Dates of the readings the last oref run consumed (the 5-minute comb), published by
+        /// GlucoseStorage as it builds the comb so the marks describe the list oref was handed.
+        var algorithmGlucoseDates: Set<Date> = []
         var carbsFromPersistence: [CarbEntryStored] = []
         var fpusFromPersistence: [CarbEntryStored] = []
         var determinationsFromPersistence: [OrefDetermination] = []
@@ -489,6 +492,13 @@ extension Home {
             provider.deviceManager.bolusTrigger
                 .receive(on: DispatchQueue.main)
                 .weakAssign(to: \.bolusStatus, on: self)
+                .store(in: &subscriptions)
+
+            glucoseStorage.algorithmGlucoseDatesPublisher
+                .receive(on: DispatchQueue.main)
+                .sink { [weak self] dates in
+                    self?.algorithmGlucoseDates = dates
+                }
                 .store(in: &subscriptions)
         }
 

@@ -931,6 +931,7 @@ extension MainChartCanvas {
 
             GlucoseChartView(
                 glucoseData: glucose,
+                algorithmGlucoseDates: state.algorithmGlucoseDates,
                 units: state.units,
                 highGlucose: state.highGlucose,
                 lowGlucose: state.lowGlucose,
