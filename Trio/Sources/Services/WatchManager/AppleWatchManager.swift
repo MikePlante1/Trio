@@ -205,6 +205,10 @@ final class BaseWatchManager: NSObject, WCSessionDelegate, Injectable, WatchMana
                 .getNSManagedObject(with: tempTargetPresetIds, context: context)
 
             return await context.perform {
+                // Thin minute-by-minute CGM data to the 5-minute comb; feeds
+                // the watch chart and the [0]/[1] delta below.
+                let glucoseObjects = glucoseObjects.thinnedToFiveMinuteCadence()
+
                 var watchState = WatchState(date: Date())
 
                 // Set lastLoopDate

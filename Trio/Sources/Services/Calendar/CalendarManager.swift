@@ -235,9 +235,11 @@ final class BaseCalendarManager: CalendarManager, Injectable {
             guard let determinationObject = try viewContext.existingObject(with: determinationId) as? OrefDetermination
             else { return }
 
+            // Thin minute-by-minute CGM data to the 5-minute comb; feeds the
+            // calendar event's current/previous delta pair.
             let glucoseObjects = try glucoseIds.compactMap { id in
                 try viewContext.existingObject(with: id) as? GlucoseStored
-            }
+            }.thinnedToFiveMinuteCadence()
 
             guard let lastGlucoseObject = glucoseObjects.first, let lastGlucoseValue = glucoseObjects.first?.glucose,
                   let secondLastReading = glucoseObjects.dropFirst().first?.glucose else { return }

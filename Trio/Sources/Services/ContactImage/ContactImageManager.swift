@@ -129,7 +129,7 @@ final class BaseContactImageManager: NSObject, ContactImageManager, Injectable {
             predicate: NSPredicate.predicateFor20MinAgo,
             key: "date",
             ascending: false,
-            fetchLimit: 3 /// We only need 1-3 values, depending on whether the user wants to show delta or not
+            fetchLimit: 15 /// We only need 1-3 values, plus headroom to thin minute-by-minute data to the 5-minute comb
         )
 
         return try await context.perform {
@@ -201,6 +201,7 @@ final class BaseContactImageManager: NSObject, ContactImageManager, Injectable {
             // Get NSManagedObjects on MainActor
             let glucoseObjects: [GlucoseStored] = try await CoreDataStack.shared
                 .getNSManagedObject(with: glucoseValuesIds, context: viewContext)
+                .thinnedToFiveMinuteCadence()
             let determinationObjects: [OrefDetermination] = try await CoreDataStack.shared
                 .getNSManagedObject(with: determinationIds, context: viewContext)
             let lastDetermination = determinationObjects.last

@@ -21,7 +21,9 @@ extension LiveActivityManager {
                 throw CoreDataError.fetchError(function: #function, file: #file)
             }
 
-            return glucoseResults.map {
+            // Thin minute-by-minute CGM data to the 5-minute comb; feeds the
+            // Live Activity chart and its current/previous delta pair.
+            return glucoseResults.thinnedToFiveMinuteCadence().map {
                 GlucoseData(glucose: Int($0.glucose), date: $0.date ?? Date(), direction: $0.directionEnum)
             }
         }

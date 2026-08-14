@@ -809,7 +809,10 @@ extension Treatments.StateModel {
     }
 
     @MainActor private func updateGlucoseFromController() {
-        guard let objects = glucoseController.fetchedObjects else { return }
+        guard let fetchedObjects = glucoseController.fetchedObjects else { return }
+
+        // Thin minute-by-minute CGM data to the 5-minute comb (no-op otherwise).
+        let objects = fetchedObjects.thinnedToFiveMinuteCadence()
 
         // Store all objects for the forecast graph
         glucoseFromPersistence = objects

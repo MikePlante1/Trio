@@ -555,8 +555,11 @@ final class BaseGarminManager: NSObject, GarminManager, Injectable {
             debug(.watchManager, "Garmin: Preparing watch state [Trigger: \(triggeredBy)]")
         }
 
-        // Fetch glucose - SwissAlpine needs 24, Trio needs 2 (for delta calculation)
-        let glucoseLimit = needsHistoricalGlucoseData ? 24 : 2
+        // Fetch glucose - SwissAlpine needs 24, Trio needs 2 (for delta calculation).
+        // Fetched at 5x so that thinning minute-by-minute data to the 5-minute comb below
+        // still yields those counts; for a standard 5-minute source thinning is a no-op and
+        // the surplus rows are trimmed back to the same 24 the watchface expects.
+        let glucoseLimit = needsHistoricalGlucoseData ? 24 * 5 : 15
         let glucoseIds = try await fetchGlucose(limit: glucoseLimit)
 
         // Fetch all determinations from last 30 minutes (no limit)
@@ -590,8 +593,17 @@ final class BaseGarminManager: NSObject, GarminManager, Injectable {
         context.name = "setupGarminWatchState"
 
         let watchStates = await context.perform {
-            // Fetch Core Data objects inside perform block
-            let glucoseObjects = glucoseIds.compactMap { context.object(with: $0) as? GlucoseStored }
+            // Fetch Core Data objects inside perform block.
+            // Thin minute-by-minute CGM data to the 5-minute comb (no-op otherwise), then trim
+            // to the count the watchface contract expects: the graph slot count is inferred
+            // from the gap between the first two entries, so the emitted count must not change
+            // with cadence. This feeds both the history array and the [0]/[1] delta below.
+            let glucoseObjects = Array(
+                glucoseIds
+                    .compactMap { context.object(with: $0) as? GlucoseStored }
+                    .thinnedToFiveMinuteCadence()
+                    .prefix(needsHistoricalData ? 24 : 2)
+            )
             let allDeterminationObjects = allDeterminationIds.compactMap { context.object(with: $0) as? OrefDetermination }
             let tempBasalObjects = tempBasalIds.compactMap { context.object(with: $0) as? PumpEventStored }
             var watchStates: [GarminWatchState] = []

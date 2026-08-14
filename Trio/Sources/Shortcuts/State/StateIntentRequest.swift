@@ -59,14 +59,20 @@ final class StateIntentRequest: BaseIntentsRequest {
         -> (dateGlucose: Date, glucose: String, trend: String, delta: String)
     {
         do {
-            let results = try CoreDataStack.shared.fetchEntities(
+            // Fetch headroom beyond the 2 readings we need, then thin
+            // minute-by-minute data to the 5-minute comb. Thinning yields roughly one
+            // comb reading per 5 rows, so 10 would leave exactly 2 with nothing to
+            // spare: minute mode's ingestion gate admits 30 s spacing, and any burst
+            // tighter than 1/min would collapse the comb to a single reading and blank
+            // the delta. 15 matches the limit ContactImageManager fetches.
+            let results = ((try CoreDataStack.shared.fetchEntities(
                 ofType: GlucoseStored.self,
                 onContext: onContext,
                 predicate: NSPredicate.predicateFor30MinAgo,
                 key: "date",
                 ascending: false,
-                fetchLimit: 2
-            ) as? [GlucoseStored] ?? []
+                fetchLimit: 15
+            ) as? [GlucoseStored]) ?? []).thinnedToFiveMinuteCadence()
 
             guard let lastValue = results.first else { throw StateIntentError.NoBG }
 

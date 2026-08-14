@@ -210,6 +210,14 @@ final class BaseBolusCalculationManager: BolusCalculationManager, Injectable {
     /// - Parameter objects: Array of GlucoseStored objects
     /// - Returns: GlucoseVariables containing current blood glucose and delta
     private func updateGlucoseVariables(with objects: [GlucoseStored]) -> GlucoseVariables {
+        // Thin minute-by-minute CGM data to the 5-minute comb (no-op otherwise). The
+        // 20-minute window below is what makes the delta a 15-minute one: at 5-minute
+        // cadence it holds four readings and the oldest sits at -15. Left raw, a
+        // 1-minute feed fills that window with ~20 readings whose oldest is at -19,
+        // inflating the trend by about a quarter — and `deltaBG` is documented, and
+        // consumed by fifteenMinutesInsulin, as a 15-minute change.
+        let objects = objects.thinnedToFiveMinuteCadence()
+
         // Always use the most recent reading for current glucose regardless of time
         let lastGlucose = objects.first?.glucose ?? 0
 

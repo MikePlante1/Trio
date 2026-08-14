@@ -20,7 +20,10 @@ extension Home.StateModel {
     @MainActor func updateGlucoseFromController() {
         guard let objects = glucoseController.fetchedObjects else { return }
         glucoseFromPersistence = objects
-        latestTwoGlucoseValues = Array(objects.suffix(2))
+        // The main chart keeps full resolution; the header delta pair comes from
+        // the live 5-minute comb, which anchors on the most recent reading.
+        let thinned = objects.thinnedToFiveMinuteCadence()
+        latestTwoGlucoseValues = Array(thinned.suffix(2))
         updateGlucoseChartYAxis(glucoseValues: objects)
     }
 
