@@ -17,6 +17,9 @@ enum GlucoseDeduplicationInterval {
 
 protocol GlucoseStorage {
     var updatePublisher: AnyPublisher<Void, Never> { get }
+    /// Dates of the comb readings the algorithm consumed on its most recent cycle, in the
+    /// stretches where thinning actually removed readings. Replays the current set on subscription.
+    var algorithmGlucoseDatesPublisher: AnyPublisher<Set<Date>, Never> { get }
     func storeGlucose(_ glucose: [BloodGlucose]) async throws
     func backfillGlucose(_ glucose: [BloodGlucose], deduplicationInterval: TimeInterval) async throws
     func addManualGlucose(glucose: Int)
@@ -58,6 +61,17 @@ final class BaseGlucoseStorage: GlucoseStorage, Injectable {
     var updatePublisher: AnyPublisher<Void, Never> {
         updateSubject.eraseToAnyPublisher()
     }
+
+    private let algorithmGlucoseDatesSubject = CurrentValueSubject<Set<Date>, Never>([])
+
+    var algorithmGlucoseDatesPublisher: AnyPublisher<Set<Date>, Never> {
+        algorithmGlucoseDatesSubject.eraseToAnyPublisher()
+    }
+
+    /// One comb per algorithm cycle, keyed on the newest stored reading. Guarded by a lock
+    /// because autosens and determineBasal can both reach it.
+    private var algorithmCombCache: (anchor: Date?, smoothed: Bool, comb: [BloodGlucose])?
+    private let algorithmCombLock = NSLock()
 
     private enum Config {
         static let filterTime: TimeInterval = 3.5 * 60
@@ -468,9 +482,36 @@ final class BaseGlucoseStorage: GlucoseStorage, Injectable {
     /// The fetch window is bounded by `fetchHours`: determineBasal feeds `maxMealAbsorptionTime + 0.5h`
     /// (just enough glucose to cover the longest tracked meal absorption plus a small lead-in); Autosens
     /// uses the default 24h because its sensitivity algorithm needs that full window.
+    /// Both algorithm entry points read one comb per cycle rather than thinning their own fetch.
+    /// The comb anchors on the most recent reading, so thinning twice at two different moments
+    /// yields two differently-phased lists; deriving determineBasal's window, autosens' window,
+    /// the smoothed values and the chart's marks from a single snapshot makes them describe the
+    /// same readings by construction. The snapshot is keyed on the newest stored reading, so a
+    /// second caller in the same cycle reuses it and a genuinely newer reading rebuilds it.
+    ///
+    /// Slicing is sound: thinning walks newest to oldest and each decision depends only on
+    /// readings newer than the one being judged, so the head of the 24 h comb is identical to
+    /// the comb a shorter fetch would have produced from the same anchor.
     func getGlucoseForAlgorithm(shouldSmoothGlucose: Bool, fetchHours: Decimal) async throws -> [BloodGlucose] {
-        let context = makeContext()
+        let comb = try await algorithmComb(shouldSmoothGlucose: shouldSmoothGlucose)
         let cutoff = Date().addingTimeInterval(-(Double(truncating: fetchHours as NSNumber) * 3600))
+        return comb.filter { $0.dateString >= cutoff }
+    }
+
+    /// The 5-minute comb for this algorithm cycle, newest first, covering `FiveMinuteCadence.algorithmWindow`.
+    private func algorithmComb(shouldSmoothGlucose: Bool) async throws -> [BloodGlucose] {
+        let anchor = lastGlucoseDate()
+
+        algorithmCombLock.lock()
+        if let cached = algorithmCombCache, cached.anchor == anchor, cached.smoothed == shouldSmoothGlucose {
+            algorithmCombLock.unlock()
+            return cached.comb
+        }
+        algorithmCombLock.unlock()
+
+        let context = makeContext()
+        context.name = "algorithmComb"
+        let cutoff = Date().addingTimeInterval(-FiveMinuteCadence.algorithmWindow)
 
         let results = try await CoreDataStack.shared.fetchEntitiesAsync(
             ofType: GlucoseStored.self,
@@ -481,10 +522,13 @@ final class BaseGlucoseStorage: GlucoseStorage, Injectable {
             batchSize: 48
         )
 
-        return try await context.perform {
+        let (comb, markers) = try await context.perform {
             guard let glucoseResults = results as? [GlucoseStored] else {
                 throw CoreDataError.fetchError(function: #function, file: #file)
             }
+
+            // oref is tuned for the 5-minute CGM cadence; no-op for standard sources.
+            let cadenceThinned = glucoseResults.thinnedToFiveMinuteCadence()
 
             // extracting handler to only create it 1x
             let roundingBehavior = NSDecimalNumberHandler(
@@ -496,10 +540,21 @@ final class BaseGlucoseStorage: GlucoseStorage, Injectable {
                 raiseOnDivideByZero: false
             )
 
-            return glucoseResults.map {
-                Self.mapToBloodGlucose($0, shouldSmoothGlucose: shouldSmoothGlucose, roundingBehavior: roundingBehavior)
-            }
+            return (
+                cadenceThinned.map {
+                    Self.mapToBloodGlucose($0, shouldSmoothGlucose: shouldSmoothGlucose, roundingBehavior: roundingBehavior)
+                },
+                glucoseResults.fiveMinuteCombMarkers(comb: cadenceThinned)
+            )
         }
+
+        algorithmCombLock.lock()
+        algorithmCombCache = (anchor: anchor, smoothed: shouldSmoothGlucose, comb: comb)
+        algorithmCombLock.unlock()
+
+        algorithmGlucoseDatesSubject.send(markers)
+
+        return comb
     }
 
     /// The glucose value the algorithm consumes for a stored reading: the smoothed value when
