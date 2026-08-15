@@ -5,9 +5,11 @@ import Foundation
 /// The same shape is written into the app bundle at build time by
 /// `scripts/capture-release-notes.sh`, so the bundled fallback and a live fetch decode
 /// through this one type.
-struct ReleaseNotes: Codable, Equatable {
+struct ReleaseNotes: Codable, Equatable, Identifiable {
     /// Git tag of the release, for example `v0.8.4`.
     let tagName: String
+
+    var id: String { tagName }
 
     /// Human readable release name, for example `Trio v0.8.4`.
     let name: String
@@ -37,6 +39,19 @@ struct ReleaseNotes: Codable, Equatable {
     var url: URL? {
         URL(string: htmlURL)
     }
+
+    /// Publication date, or `nil` when GitHub supplied none.
+    var publishedDate: Date? {
+        publishedAt.isEmpty ? nil : ISO8601DateFormatter().date(from: publishedAt)
+    }
+
+    /// Publication date formatted for display, empty when unavailable.
+    var publishedDateString: String {
+        guard let publishedDate else {
+            return ""
+        }
+        return publishedDate.formatted(date: .abbreviated, time: .omitted)
+    }
 }
 
 extension ReleaseNotes {
@@ -50,18 +65,19 @@ extension ReleaseNotes {
         let publishedAt: String
     }
 
-    /// Decodes the copy written into the app bundle at build time.
+    /// Decodes the releases written into the app bundle at build time, newest first.
     ///
     /// - Parameter data: Contents of `BundledReleaseNotes.json`.
-    static func decodeBundled(from data: Data) throws -> ReleaseNotes {
-        let bundled = try JSONDecoder().decode(Bundled.self, from: data)
-        return ReleaseNotes(
-            tagName: bundled.tagName,
-            name: bundled.name,
-            body: bundled.body,
-            htmlURL: bundled.htmlURL,
-            publishedAt: bundled.publishedAt
-        )
+    static func decodeBundled(from data: Data) throws -> [ReleaseNotes] {
+        try JSONDecoder().decode([Bundled].self, from: data).map {
+            ReleaseNotes(
+                tagName: $0.tagName,
+                name: $0.name,
+                body: $0.body,
+                htmlURL: $0.htmlURL,
+                publishedAt: $0.publishedAt
+            )
+        }
     }
 }
 

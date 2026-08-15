@@ -2,18 +2,15 @@
 #  capture-release-notes.sh
 #  Trio
 #
-#  Bundles the GitHub release notes for the version being built, so the "What's New"
-#  panel has something to show when the device is offline or GitHub is unreachable.
+#  Bundles GitHub release notes for the version line being built, so the release notes
+#  list still works when the device is offline or GitHub is unreachable.
 #
-#  At runtime Trio still prefers a live fetch, because release notes are sometimes
-#  edited after publishing. This is only the fallback.
+#  Every stable release back to the last major or minor bump is kept: building 0.8.4
+#  bundles 0.8.0 through 0.8.4. At runtime Trio still prefers a live fetch, because
+#  release notes are sometimes edited after publishing. This is only the fallback.
 #
-#  The release is looked up by the exact tag "v${APP_VERSION}". Development builds
-#  carry a four-part APP_DEV_VERSION that matches no published release, so nothing is
-#  bundled for them and the panel stays hidden - which is intended.
-#
-#  This never fails the build. No network, no release, no GitHub - the app simply
-#  falls back to a live fetch, and shows nothing if that fails too.
+#  This never fails the build. No network, no releases, no GitHub - the app falls back
+#  to a live fetch, and shows nothing if that fails too.
 
 set -u
 
@@ -43,55 +40,81 @@ fi
 
 # PlistBuddy reports failures on stdout rather than stderr, so an unreadable plist
 # would otherwise be treated as the version string. Insist on a dotted numeric
-# version before it is used to build a URL.
+# version before it is used.
 if ! echo "${version}" | grep -Eq '^[0-9]+(\.[0-9]+)*$'; then
   warn "could not determine a valid app version, skipping"
   exit 0
 fi
 
-tag="v${version}"
-echo "capture-release-notes: looking up ${REPO} release ${tag}"
+major_minor=$(echo "${version}" | awk -F. '{print $1"."$2}')
+echo "capture-release-notes: collecting ${REPO} releases in the ${major_minor}.x line up to ${version}"
 
-# --fail so a 404 (no release for this tag, e.g. a dev build) is not written out as
-# an error payload. Short timeouts so an offline build is not held up.
 if ! curl --fail --silent --show-error --location \
-  --connect-timeout 5 --max-time 20 \
+  --connect-timeout 5 --max-time 30 \
   -H "Accept: application/vnd.github+json" \
-  "https://api.github.com/repos/${REPO}/releases/tags/${tag}" \
+  "https://api.github.com/repos/${REPO}/releases?per_page=100" \
   -o "${OUTPUT}.raw" 2>/dev/null
 then
-  warn "no published release found for ${tag} (or GitHub unreachable); building without bundled notes"
+  warn "could not reach GitHub; building without bundled notes"
   rm -f "${OUTPUT}.raw"
   exit 0
 fi
 
-# Reduce the API payload to just the fields the app reads, so the bundle does not
-# carry the entire release object.
-if ! /usr/bin/python3 - "${OUTPUT}.raw" "${OUTPUT}" <<'PY'
+# Keep only the fields the app reads, so the bundle does not carry whole release objects.
+if ! /usr/bin/python3 - "${OUTPUT}.raw" "${OUTPUT}" "${version}" <<'PY'
 import json, sys
 
-src, dst = sys.argv[1], sys.argv[2]
+src, dst, version = sys.argv[1], sys.argv[2], sys.argv[3]
+
+
+def parts(tag):
+    return [int(piece) for piece in tag.lstrip("v").split(".")]
+
+
 try:
     with open(src, encoding="utf-8") as handle:
-        release = json.load(handle)
-    payload = {
-        "tagName": release["tag_name"],
-        "name": release.get("name") or release["tag_name"],
-        "body": release.get("body") or "",
-        "htmlURL": release["html_url"],
-        "publishedAt": release.get("published_at") or "",
-    }
+        releases = json.load(handle)
+
+    current = parts(version)
+    line = current[:2]
+    kept = []
+
+    for release in releases:
+        if release.get("draft") or release.get("prerelease"):
+            continue
+        tag = release.get("tag_name") or ""
+        try:
+            numbers = parts(tag)
+        except ValueError:
+            continue
+        if numbers[:2] != line or numbers > current:
+            continue
+        kept.append({
+            "tagName": tag,
+            "name": release.get("name") or tag,
+            "body": release.get("body") or "",
+            "htmlURL": release["html_url"],
+            "publishedAt": release.get("published_at") or "",
+        })
+
+    if not kept:
+        raise SystemExit(2)
+
+    kept.sort(key=lambda item: parts(item["tagName"]), reverse=True)
     with open(dst, "w", encoding="utf-8") as handle:
-        json.dump(payload, handle, ensure_ascii=False)
+        json.dump(kept, handle, ensure_ascii=False)
+    print("kept " + ", ".join(item["tagName"] for item in kept), file=sys.stderr)
+except SystemExit:
+    raise
 except Exception as error:  # noqa: BLE001 - build step must never hard-fail
     print(f"could not parse release payload: {error}", file=sys.stderr)
     raise SystemExit(1)
 PY
 then
-  warn "could not parse release payload; building without bundled notes"
+  warn "no published releases found in the ${major_minor}.x line; building without bundled notes"
   rm -f "${OUTPUT}" "${OUTPUT}.raw"
   exit 0
 fi
 
 rm -f "${OUTPUT}.raw"
-echo "capture-release-notes: bundled release notes for ${tag}"
+echo "capture-release-notes: bundled release notes for the ${major_minor}.x line"
