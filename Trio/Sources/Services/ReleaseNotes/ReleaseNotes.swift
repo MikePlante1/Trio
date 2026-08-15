@@ -199,7 +199,7 @@ extension ReleaseNotes {
             guard let kind = currentKind else {
                 return
             }
-            let text = currentLines.joined(separator: " ").trimmingCharacters(in: .whitespaces)
+            let text = currentLines.joined(separator: "\n").trimmingCharacters(in: .whitespaces)
             guard !text.isEmpty else {
                 return
             }
