@@ -1,84 +1,54 @@
 import SwiftUI
 
-/// Full-height sheet summarising what changed in the installed release.
-///
-/// Shows the release's own summary, any GitHub alert callouts it carries, and the bullets from
-/// its "What's Changed At A Glance" section. The complete notes, including the pull request
-/// lists, stay on GitHub behind the link at the bottom.
-struct ReleaseNotesSheetView: View {
+/// Body of a release's notes: its summary, any GitHub alert callouts, and the bullets from its
+/// "What's Changed At A Glance" section. The full notes, including the pull request lists, stay on
+/// GitHub behind the link at the bottom.
+struct ReleaseNotesContentView: View {
     let notes: ReleaseNotes
 
-    /// Called when the user dismisses the sheet with the acknowledge button.
-    ///
-    /// Not called when the sheet is swiped away, so the Home panel survives an accidental
-    /// dismissal and the notes can still be found.
-    let onAcknowledge: () -> Void
-
-    @Environment(\.dismiss) private var dismiss
-
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    Text(notes.name)
-                        .font(.largeTitle)
-                        .bold()
-                        .frame(maxWidth: .infinity, alignment: .leading)
-
-                    if !notes.summary.isEmpty {
-                        Text(markdown(notes.summary))
-                            .font(.body)
-                    }
-
-                    ForEach(notes.callouts) { callout in
-                        calloutView(callout)
-                    }
-
-                    if !notes.highlights.isEmpty {
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("What's Changed At A Glance", comment: "Heading above the release note highlights")
-                                .font(.headline)
-
-                            ForEach(notes.highlights) { highlight in
-                                highlightRow(highlight)
-                            }
-                        }
-                    }
-
-                    Button {
-                        if let url = notes.url {
-                            UIApplication.shared.open(url)
-                        }
-                    } label: {
-                        HStack {
-                            Text("Read the full release notes", comment: "Link to the complete release notes on GitHub")
-                            Spacer()
-                            Image(systemName: "arrow.up.right.square")
-                        }
-                    }
-                    .disabled(notes.url == nil)
-                    .padding(.top, 4)
-                }
+        VStack(alignment: .leading, spacing: 20) {
+            Text(notes.name)
+                .font(.largeTitle)
+                .bold()
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding()
+
+            if !notes.summary.isEmpty {
+                Text(markdown(notes.summary))
+                    .font(.body)
             }
-            .navigationTitle(Text("What's New?", comment: "Navigation title of the release notes sheet"))
-            .navigationBarTitleDisplayMode(.inline)
+
+            ForEach(notes.callouts) { callout in
+                calloutView(callout)
+            }
+
+            if !notes.highlights.isEmpty {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("What's Changed At A Glance", comment: "Heading above the release note highlights")
+                        .font(.headline)
+
+                    ForEach(notes.highlights) { highlight in
+                        highlightRow(highlight)
+                    }
+                }
+            }
 
             Button {
-                onAcknowledge()
-                dismiss()
+                if let url = notes.url {
+                    UIApplication.shared.open(url)
+                }
             } label: {
-                Text("Got it!", comment: "Dismiss button for the release notes sheet")
-                    .bold()
-                    .frame(maxWidth: .infinity, minHeight: 30, alignment: .center)
+                HStack {
+                    Text("Read the full release notes", comment: "Link to the complete release notes on GitHub")
+                    Spacer()
+                    Image(systemName: "arrow.up.right.square")
+                }
             }
-            .buttonStyle(.bordered)
-            .padding([.horizontal, .bottom])
+            .disabled(notes.url == nil)
             .padding(.top, 4)
         }
-        .presentationDetents([.large])
-        .presentationDragIndicator(.visible)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding()
     }
 
     // MARK: - Subviews
@@ -116,9 +86,6 @@ struct ReleaseNotesSheetView: View {
     // MARK: - Helpers
 
     /// Renders inline Markdown, falling back to the raw text if it cannot be parsed.
-    ///
-    /// Release notes use inline code spans and links liberally, and an unparsed string is far
-    /// better than a blank row.
     private func markdown(_ text: String) -> AttributedString {
         (try? AttributedString(markdown: text, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)))
             ?? AttributedString(text)
@@ -142,5 +109,65 @@ struct ReleaseNotesSheetView: View {
         case .warning: return .orange
         case .caution: return .red
         }
+    }
+}
+
+/// Full-height sheet raised from the Home panel, which the user acknowledges to dismiss the panel.
+struct ReleaseNotesSheetView: View {
+    let notes: ReleaseNotes
+
+    /// Called when the user dismisses the sheet with the acknowledge button.
+    ///
+    /// Not called when the sheet is swiped away, so the Home panel survives an accidental
+    /// dismissal and the notes can still be found.
+    let onAcknowledge: () -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(AppState.self) private var appState
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                ReleaseNotesContentView(notes: notes)
+            }
+            .scrollContentBackground(.hidden)
+            .background(appState.trioBackgroundColor(for: colorScheme))
+            .navigationTitle(Text("What's New?", comment: "Navigation title of the release notes sheet"))
+            .navigationBarTitleDisplayMode(.inline)
+
+            Button {
+                onAcknowledge()
+                dismiss()
+            } label: {
+                Text("Got it!", comment: "Dismiss button for the release notes sheet")
+                    .bold()
+                    .frame(maxWidth: .infinity, minHeight: 30, alignment: .center)
+            }
+            .buttonStyle(.bordered)
+            .padding([.horizontal, .bottom])
+            .padding(.top, 4)
+            .background(appState.trioBackgroundColor(for: colorScheme))
+        }
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
+    }
+}
+
+/// Pushed from Settings, where the notes are browsed rather than acknowledged.
+struct ReleaseNotesDetailView: View {
+    let notes: ReleaseNotes
+
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(AppState.self) private var appState
+
+    var body: some View {
+        ScrollView {
+            ReleaseNotesContentView(notes: notes)
+        }
+        .scrollContentBackground(.hidden)
+        .background(appState.trioBackgroundColor(for: colorScheme))
+        .navigationTitle(notes.name)
+        .navigationBarTitleDisplayMode(.inline)
     }
 }

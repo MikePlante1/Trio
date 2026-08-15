@@ -27,10 +27,14 @@ import Foundation
 
     private static let bundledResourceName = "BundledReleaseNotes"
 
+    /// Oldest release worth showing. Earlier notes describe an app far enough removed from the
+    /// current one that they are more confusing than useful.
+    private static let minimumVersion = [0, 8, 0]
+
     // MARK: - Persisted State
 
-    /// Notes from the last successful fetch.
-    @Persisted(key: "cachedReleaseNotes") private var cachedNotes: ReleaseNotes? = nil
+    /// Releases from the last successful fetch, newest first.
+    @Persisted(key: "cachedReleaseList") private var cachedReleases: [ReleaseNotes]? = nil
 
     /// When `cachedNotes` was fetched.
     @Persisted(key: "releaseNotesLastFetched") private var lastFetched: Date? = .distantPast
@@ -43,8 +47,21 @@ import Foundation
 
     // MARK: - Published State
 
-    /// Notes for the installed version, once resolved. `nil` when none could be found.
-    @Published private(set) var notes: ReleaseNotes?
+    /// Stable releases up to and including this build's version, newest first.
+    @Published private(set) var releases: [ReleaseNotes] = []
+
+    /// Notes matching this build's version. `nil` when none could be found.
+    var notes: ReleaseNotes? {
+        releases.first { $0.version == installedVersion }
+    }
+
+    /// Every release older than this build's, newest first.
+    var previousReleases: [ReleaseNotes] {
+        guard let notes else {
+            return releases
+        }
+        return releases.filter { $0.version != notes.version }
+    }
 
     // MARK: - Derived State
 
@@ -71,18 +88,21 @@ import Foundation
     ///
     /// Safe to call repeatedly; the network is only touched once per `refreshInterval`.
     func load() async {
-        // Show whatever is already available first, so the panel does not wait on the network.
-        notes = resolveOffline()
+        // Show whatever is already available first, so nothing waits on the network.
+        releases = Self.supported(resolveOffline())
 
         guard shouldRefresh else {
             return
         }
 
-        if let fetched = await fetch(version: installedVersion) {
-            cachedNotes = fetched
-            lastFetched = Date()
-            notes = fetched
+        let fetched = Self.supported(await fetchReleases())
+        guard !fetched.isEmpty else {
+            return
         }
+
+        cachedReleases = fetched
+        lastFetched = Date()
+        releases = fetched
     }
 
     /// Marks the installed version's notes as seen, which removes the Home panel entry.
@@ -102,42 +122,38 @@ import Foundation
         Date().timeIntervalSince(lastFetched ?? .distantPast) > Self.refreshInterval
     }
 
-    /// Best available notes without touching the network.
-    private func resolveOffline() -> ReleaseNotes? {
-        if let cachedNotes, cachedNotes.version == installedVersion {
-            return cachedNotes
+    /// Best available releases without touching the network.
+    private func resolveOffline() -> [ReleaseNotes] {
+        if let cachedReleases, !cachedReleases.isEmpty {
+            return cachedReleases
         }
-        if let bundled = loadBundled(), bundled.version == installedVersion {
-            return bundled
-        }
-        return nil
+        return loadBundled()
     }
 
-    /// Reads the copy written into the app bundle at build time.
-    private func loadBundled() -> ReleaseNotes? {
+    /// Reads the releases written into the app bundle at build time.
+    private func loadBundled() -> [ReleaseNotes] {
         guard let url = Bundle.main.url(forResource: Self.bundledResourceName, withExtension: "json"),
               let data = try? Data(contentsOf: url)
         else {
-            return nil
+            return []
         }
 
         do {
             return try ReleaseNotes.decodeBundled(from: data)
         } catch {
             debug(.default, "Failed to decode bundled release notes: \(error)")
-            return nil
+            return []
         }
     }
 
-    /// Fetches the release whose tag matches the installed version.
+    /// Fetches published releases, keeping the stable ones this build has reached.
     ///
-    /// Returns `nil` for any failure, including no release existing for this version, which is
-    /// the normal case for a build made between releases.
-    private func fetch(version: String) async -> ReleaseNotes? {
-        guard !version.isEmpty,
-              let url = URL(string: "https://api.github.com/repos/\(Self.repository)/releases/tags/v\(version)")
-        else {
-            return nil
+    /// Prereleases and drafts are dropped, as is anything newer than the installed version, so
+    /// the list never advertises notes for a release the user is not running yet. Returns an
+    /// empty array on any failure.
+    private func fetchReleases() async -> [ReleaseNotes] {
+        guard let url = URL(string: "https://api.github.com/repos/\(Self.repository)/releases?per_page=100") else {
+            return []
         }
 
         var request = URLRequest(url: url)
@@ -149,14 +165,72 @@ import Foundation
 
             guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
                 let status = (response as? HTTPURLResponse)?.statusCode ?? -1
-                debug(.default, "Release notes fetch for v\(version) returned status \(status)")
-                return nil
+                debug(.default, "Release list fetch returned status \(status)")
+                return []
             }
 
-            return try JSONDecoder().decode(ReleaseNotes.self, from: data)
+            let installed = Self.versionComponents(installedVersion)
+
+            return try JSONDecoder().decode([GitHubRelease].self, from: data)
+                .filter { !$0.draft && !$0.prerelease }
+                .map(\.notes)
+                .filter {
+                    installed.isEmpty || Self.versionComponents($0.version).lexicographicallyPrecedes(installed) || $0
+                        .version == installedVersion }
+                .sorted { Self.versionComponents($1.version).lexicographicallyPrecedes(Self.versionComponents($0.version)) }
         } catch {
-            debug(.default, "Failed to fetch release notes for v\(version): \(error)")
-            return nil
+            debug(.default, "Failed to fetch release list: \(error)")
+            return []
         }
+    }
+
+    /// Drops releases older than `minimumVersion`.
+    private static func supported(_ releases: [ReleaseNotes]) -> [ReleaseNotes] {
+        releases.filter { release in
+            let components = versionComponents(release.version)
+            return !components.isEmpty && !components.lexicographicallyPrecedes(minimumVersion)
+        }
+    }
+
+    /// Numeric components of a version, for ordering. Empty when it is not dotted numerals.
+    private static func versionComponents(_ version: String) -> [Int] {
+        let pieces = version.split(separator: ".").map { Int($0) }
+        guard !pieces.isEmpty, !pieces.contains(nil) else {
+            return []
+        }
+        return pieces.compactMap { $0 }
+    }
+}
+
+// MARK: - GitHub payload
+
+/// Release as returned by the list endpoint, which carries fields the app does not keep.
+private struct GitHubRelease: Decodable {
+    let tagName: String
+    let name: String?
+    let body: String?
+    let htmlURL: String
+    let publishedAt: String?
+    let draft: Bool
+    let prerelease: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case tagName = "tag_name"
+        case name
+        case body
+        case htmlURL = "html_url"
+        case publishedAt = "published_at"
+        case draft
+        case prerelease
+    }
+
+    var notes: ReleaseNotes {
+        ReleaseNotes(
+            tagName: tagName,
+            name: name ?? tagName,
+            body: body ?? "",
+            htmlURL: htmlURL,
+            publishedAt: publishedAt ?? ""
+        )
     }
 }

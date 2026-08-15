@@ -36,7 +36,6 @@ extension Settings {
         )
         @State private var closedLoopDisabled = true
         @State private var showCopiedToast = false
-        @State private var showReleaseNotes = false
         @ObservedObject private var releaseNotesService = ReleaseNotesService.shared
 
         @Environment(\.colorScheme) var colorScheme
@@ -291,26 +290,42 @@ extension Settings {
                         }
                     ).listRowBackground(Color.chart)
 
-                    if let notes = releaseNotesService.notes {
+                    if !releaseNotesService.releases.isEmpty {
                         Section(
-                            header: Text("Latest Release"),
+                            header: Text("Release Notes"),
                             content: {
-                                Button {
-                                    showReleaseNotes = true
-                                } label: {
-                                    HStack {
-                                        Text(
-                                            "What's new? v\(notes.version)",
-                                            comment: "Settings row opening the release notes; the placeholder is a version number"
-                                        )
-                                        .foregroundColor(.primary)
-                                        Spacer()
-                                        Image(systemName: "chevron.right")
-                                            .foregroundColor(.secondary)
-                                            .font(.footnote)
+                                if let current = releaseNotesService.notes {
+                                    NavigationLink(destination: ReleaseNotesDetailView(notes: current)) {
+                                        HStack {
+                                            VStack(alignment: .leading, spacing: 2) {
+                                                Text(current.name)
+                                                    .foregroundColor(.primary)
+
+                                                Text(
+                                                    "Current release",
+                                                    comment: "Marks the release notes entry matching the running build"
+                                                )
+                                                .font(.caption)
+                                                .foregroundColor(.secondary)
+                                            }
+
+                                            Spacer()
+
+                                            Text(current.publishedDateString)
+                                                .font(.caption)
+                                                .foregroundColor(.secondary)
+                                        }
                                     }
                                 }
-                                .frame(maxWidth: .infinity, alignment: .leading)
+
+                                if !releaseNotesService.previousReleases.isEmpty {
+                                    NavigationLink(
+                                        destination: ReleaseNotesListView(releases: releaseNotesService.previousReleases)
+                                    ) {
+                                        Text("Previous Versions")
+                                            .foregroundColor(.primary)
+                                    }
+                                }
                             }
                         ).listRowBackground(Color.chart)
                     }
@@ -381,13 +396,6 @@ extension Settings {
             }
             .sheet(isPresented: $showShareSheet) {
                 ShareSheet(activityItems: state.logItems())
-            }
-            .sheet(isPresented: $showReleaseNotes) {
-                if let notes = releaseNotesService.notes {
-                    // Opening from Settings deliberately does not acknowledge: the Home panel is
-                    // dismissed by reading the notes there, not by browsing them later.
-                    ReleaseNotesSheetView(notes: notes) {}
-                }
             }
             .onAppear(perform: configureView)
             .task {
