@@ -55,12 +55,14 @@ struct ReleaseNotesContentView: View {
 
     @ViewBuilder private func highlightRow(_ highlight: ReleaseNotes.Highlight) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Text(verbatim: "•")
+            Text(verbatim: highlight.level > 0 ? "◦" : "•")
                 .foregroundStyle(.secondary)
 
             Group {
                 if highlight.subject.isEmpty {
                     Text(markdown(highlight.detail))
+                } else if highlight.detail.isEmpty {
+                    Text(highlight.subject).bold()
                 } else {
                     Text(highlight.subject).bold() + Text(verbatim: " — ") + Text(markdown(highlight.detail))
                 }
@@ -68,6 +70,7 @@ struct ReleaseNotesContentView: View {
             .font(.body)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .padding(.leading, CGFloat(highlight.level) * 16)
     }
 
     @ViewBuilder private func calloutView(_ callout: ReleaseNotes.Callout) -> some View {

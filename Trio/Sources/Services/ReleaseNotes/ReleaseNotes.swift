@@ -91,8 +91,11 @@ extension ReleaseNotes {
         /// The bolded lead-in, for example `MedtrumKit`. Empty when the bullet has none.
         let subject: String
 
-        /// The rest of the bullet.
+        /// The rest of the bullet. Empty when the bullet is only a heading for nested ones.
         let detail: String
+
+        /// Nesting depth, 0 for a top level bullet.
+        let level: Int
     }
 
     /// A GitHub alert callout, for example `> [!IMPORTANT]`.
@@ -122,11 +125,15 @@ extension ReleaseNotes {
     /// set would treat `\r` and `\n` as two separate breaks and yield a spurious blank line
     /// between every real one, which is enough to break multi-line parsing.
     private var bodyLines: [String] {
+        rawBodyLines.map { $0.trimmingCharacters(in: .whitespaces) }
+    }
+
+    /// Body split into lines with leading whitespace intact, so nesting can be measured.
+    private var rawBodyLines: [String] {
         body
             .replacingOccurrences(of: "\r\n", with: "\n")
             .replacingOccurrences(of: "\r", with: "\n")
             .components(separatedBy: "\n")
-            .map { $0.trimmingCharacters(in: .whitespaces) }
     }
 
     /// The bullets under "What's Changed At A Glance".
@@ -139,7 +146,9 @@ extension ReleaseNotes {
         var result: [Highlight] = []
         var insideSection = false
 
-        for line in bodyLines {
+        for rawLine in rawBodyLines {
+            let line = rawLine.trimmingCharacters(in: .whitespaces)
+
             if line.hasPrefix("#") {
                 // A heading either opens the section we want or closes it again.
                 let heading = line.drop(while: { $0 == "#" }).trimmingCharacters(in: .whitespaces)
@@ -169,7 +178,7 @@ extension ReleaseNotes {
                 continue
             }
 
-            result.append(Self.parseBullet(bullet, id: result.count))
+            result.append(Self.parseBullet(bullet, id: result.count, level: Self.indentLevel(of: rawLine)))
         }
 
         return result
@@ -247,16 +256,31 @@ extension ReleaseNotes {
         return result
     }
 
+    /// Nesting depth of a bullet, from its leading whitespace. Tabs count as one level.
+    private static func indentLevel(of rawLine: String) -> Int {
+        var spaces = 0
+        for character in rawLine {
+            if character == " " {
+                spaces += 1
+            } else if character == "\t" {
+                spaces += 2
+            } else {
+                break
+            }
+        }
+        return min(spaces / 2, 2)
+    }
+
     /// Splits a bullet into its bolded lead-in and the remaining text.
     ///
     /// Trio writes these as `**Subject** — detail`. Anything that does not follow that shape
     /// is kept whole as the detail, so an unexpected format degrades to plain text rather
     /// than being dropped.
-    private static func parseBullet(_ bullet: String, id: Int) -> Highlight {
+    private static func parseBullet(_ bullet: String, id: Int, level: Int) -> Highlight {
         guard bullet.hasPrefix("**"),
               let closing = bullet.range(of: "**", range: bullet.index(bullet.startIndex, offsetBy: 2) ..< bullet.endIndex)
         else {
-            return Highlight(id: id, subject: "", detail: bullet)
+            return Highlight(id: id, subject: "", detail: bullet, level: level)
         }
 
         let subject = String(bullet[bullet.index(bullet.startIndex, offsetBy: 2) ..< closing.lowerBound])
@@ -268,12 +292,13 @@ extension ReleaseNotes {
             break
         }
 
-        // Some bullets are a bold heading with their detail in nested sub-bullets, which are
-        // not rendered. Promote the subject to the detail so the row is not left blank.
-        guard !detail.isEmpty else {
-            return Highlight(id: id, subject: "", detail: subject.trimmingCharacters(in: CharacterSet(charactersIn: ":")))
-        }
-
-        return Highlight(id: id, subject: subject, detail: detail)
+        // A bold bullet with no detail introduces the nested bullets beneath it, so the
+        // subject stays as the subject and keeps its emphasis.
+        return Highlight(
+            id: id,
+            subject: subject.trimmingCharacters(in: CharacterSet(charactersIn: ":")),
+            detail: detail,
+            level: level
+        )
     }
 }
