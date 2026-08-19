@@ -49,15 +49,35 @@ fi
 major_minor=$(echo "${version}" | awk -F. '{print $1"."$2}')
 echo "capture-release-notes: collecting ${REPO} releases in the ${major_minor}.x line up to ${version}"
 
-if ! curl --fail --silent --show-error --location \
-  --connect-timeout 5 --max-time 30 \
-  -H "Accept: application/vnd.github+json" \
-  "https://api.github.com/repos/${REPO}/releases?per_page=100" \
-  -o "${OUTPUT}.raw" 2>/dev/null
-then
-  warn "could not reach GitHub; building without bundled notes"
-  rm -f "${OUTPUT}.raw"
-  exit 0
+# GitHub allows 60 unauthenticated API calls per hour per IP, and CI runners share
+# egress addresses, so an unauthenticated build can be refused because of traffic it
+# has nothing to do with. GH_PAT is already in the workflow environment.
+token="${GH_PAT:-${GITHUB_TOKEN:-}}"
+if [ -n "${token}" ]; then
+  set -- -H "Authorization: Bearer ${token}"
+else
+  set --
+fi
+
+fetch_releases() {
+  curl --fail --silent --show-error --location \
+    --connect-timeout 5 --max-time 30 \
+    -H "Accept: application/vnd.github+json" \
+    "$@" \
+    "https://api.github.com/repos/${REPO}/releases?per_page=100" \
+    -o "${OUTPUT}.raw" 2>/dev/null
+}
+
+if ! fetch_releases "$@"; then
+  # An expired or malformed token would otherwise do worse than no token at all, so
+  # fall back to an unauthenticated call before giving up.
+  if [ "$#" -gt 0 ] && fetch_releases; then
+    warn "token was rejected; fetched release notes unauthenticated"
+  else
+    warn "could not reach GitHub; building without bundled notes"
+    rm -f "${OUTPUT}.raw"
+    exit 0
+  fi
 fi
 
 # Keep only the fields the app reads, so the bundle does not carry whole release objects.
