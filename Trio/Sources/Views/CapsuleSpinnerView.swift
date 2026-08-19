@@ -44,7 +44,7 @@ struct CapsuleSpinnerView<Content: View>: View {
                 Group {
                     if isAnimating {
                         DashedCapsuleBorder(progress: spinProgress)
-                            .stroke(color.opacity(0.4), style: StrokeStyle(lineWidth: 2.2, lineCap: .round))
+                            .stroke(color.opacity(0.4), style: StrokeStyle(lineWidth: 2.05, lineCap: .round))
                             .transition(.opacity)
                     } else {
                         Capsule()
