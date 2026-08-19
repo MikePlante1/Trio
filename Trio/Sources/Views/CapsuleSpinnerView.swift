@@ -9,9 +9,7 @@ struct CapsuleSpinnerView<Content: View>: View {
     let content: (Bool) -> Content
 
     @State private var isAnimating: Bool = false
-    @State private var dashPhase: CGFloat = 0.0
-    @State private var perimeter: CGFloat = 200
-    @State private var contentSize: CGSize = .zero
+    @State private var spinProgress: CGFloat = 0.0
     @State private var spinStartDate: Date? = nil
     @State private var startAnimationTask: Task<Void, Never>? = nil
     @State private var stopAnimationTask: Task<Void, Never>? = nil
@@ -39,80 +37,28 @@ struct CapsuleSpinnerView<Content: View>: View {
     }
 
     var body: some View {
-        ZStack {
-            // INVISIBLE MEASUREMENT LAYER
-            content(isAnimating)
-                .padding(.vertical, 5)
-                .padding(.horizontal, 10)
-                .hidden()
-                .background(
-                    GeometryReader { geo in
-                        Color.clear
-                            .onAppear {
-                                contentSize = geo.size
-                                updatePerimeter(size: geo.size)
-                                // If it was supposed to loop initially, trigger it now that we know the size
-                                if isLooping {
-                                    updateAnimating(true)
-                                }
-                            }
-                            .onChange(of: geo.size) { _, newSize in
-                                withAnimation(.easeInOut(duration: 0.2)) {
-                                    contentSize = newSize
-                                    updatePerimeter(size: newSize)
-                                }
-                            }
+        content(isAnimating)
+            .padding(.vertical, 5)
+            .padding(.horizontal, 10)
+            .overlay(
+                Group {
+                    if isAnimating {
+                        DashedCapsuleBorder(progress: spinProgress)
+                            .stroke(color.opacity(0.4), style: StrokeStyle(lineWidth: 2.2, lineCap: .round))
+                            .transition(.opacity)
+                    } else {
+                        Capsule()
+                            .stroke(color.opacity(0.4), style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                            .transition(.opacity)
                     }
-                )
-
-            // VISIBLE ANIMATED LAYER
-            content(isAnimating)
-                .padding(.vertical, 5)
-                .padding(.horizontal, 10)
-                .frame(
-                    width: contentSize.width == 0 ? nil : contentSize.width,
-                    height: contentSize.height == 0 ? nil : contentSize.height
-                )
-                .overlay(
-                    Group {
-                        if isAnimating {
-                            Capsule()
-                                .stroke(color.opacity(0.4), style: StrokeStyle(
-                                    lineWidth: 2.5,
-                                    lineCap: .round,
-                                    dash: [perimeter * 0.7, perimeter * 0.3],
-                                    dashPhase: dashPhase
-                                ))
-                                .transition(.opacity)
-                        } else {
-                            Capsule()
-                                .stroke(color.opacity(0.4), style: StrokeStyle(
-                                    lineWidth: 2,
-                                    lineCap: .round,
-                                    dash: [perimeter + 10, 0]
-                                ))
-                                .transition(.opacity)
-                        }
-                    }
-                )
-        }
-        .onAppear {
-            updateAnimating(isLooping)
-        }
-        .onChange(of: isLooping) { _, newValue in
-            updateAnimating(newValue)
-        }
-    }
-
-    private func updatePerimeter(size: CGSize) {
-        let w = size.width
-        let h = size.height
-
-        if w >= h {
-            perimeter = (2 * (w - h) + .pi * h).rounded()
-        } else {
-            perimeter = (2 * (h - w) + .pi * w).rounded()
-        }
+                }
+            )
+            .onAppear {
+                updateAnimating(isLooping)
+            }
+            .onChange(of: isLooping) { _, newValue in
+                updateAnimating(newValue)
+            }
     }
 
     private func updateAnimating(_ newValue: Bool) {
@@ -125,35 +71,32 @@ struct CapsuleSpinnerView<Content: View>: View {
             spinStartDate = Date()
 
             startAnimationTask = Task { @MainActor in
-                // 1. Fade in the spinning capsule layout structure FIRST
-                //    so the dashed Capsule actually mounts.
+                // 1. Fade in the spinning capsule
                 withAnimation(.easeInOut(duration: 0.3)) {
                     isAnimating = true
                 }
 
-                // 2. Wait for that transition to finish mounting the new capsule
+                // 2. Wait for transition
                 try? await Task.sleep(for: .seconds(0.3))
 
-                // 3. Reset dashPhase instantly, no animation
+                // 3. Reset progress instantly
                 var transaction = Transaction()
                 transaction.disablesAnimations = true
                 withTransaction(transaction) {
-                    self.dashPhase = 0.0
+                    self.spinProgress = 0.0
                 }
 
-                // 4. NOW the dashed Capsule exists — animation will actually attach
+                // 4. Drive the normalized 0.0 -> 1.0 spin loop
                 withAnimation(.linear(duration: 1.333).repeatForever(autoreverses: false)) {
-                    self.dashPhase = -self.perimeter
+                    self.spinProgress = 1.0
                 }
 
                 startAnimationTask = nil
             }
         } else {
-            // Let any in-flight start finish attaching the animation first
             stopAnimationTask?.cancel()
 
             stopAnimationTask = Task { @MainActor in
-                // Wait for start sequence to complete if it's still running
                 while startAnimationTask != nil {
                     try? await Task.sleep(for: .milliseconds(20))
                     guard !Task.isCancelled else { return }
@@ -168,24 +111,54 @@ struct CapsuleSpinnerView<Content: View>: View {
                     guard !Task.isCancelled else { return }
                 }
 
-                // 1. Fade out spinning capsule layout structure
+                // 1. Fade out spinning capsule
                 withAnimation(.easeInOut(duration: 0.3)) {
                     isAnimating = false
                 }
 
-                // 2. Wait for the fade transaction to finish unmounting the capsule
+                // 2. Wait for the transition
                 try? await Task.sleep(for: .seconds(0.3))
                 guard !Task.isCancelled else { return }
 
-                // 3. Reset spinning animation
+                // 3. Reset animation state
                 var transaction = Transaction()
                 transaction.disablesAnimations = true
                 withTransaction(transaction) {
-                    self.dashPhase = 0.0
+                    self.spinProgress = 0.0
                 }
 
                 spinStartDate = nil
             }
         }
+    }
+}
+
+// MARK: - Custom Self-Measuring Animatable Shape
+
+private struct DashedCapsuleBorder: Shape {
+    var progress: CGFloat
+
+    var animatableData: CGFloat {
+        get { progress }
+        set { progress = newValue }
+    }
+
+    func path(in rect: CGRect) -> Path {
+        let w = rect.width
+        let h = rect.height
+        let perimeter: CGFloat = w >= h
+            ? (2 * (w - h) + .pi * h).rounded()
+            : (2 * (h - w) + .pi * w).rounded()
+
+        let dashLength = perimeter * 0.7
+        let gapLength = perimeter * 0.3
+        let dashPhase = -progress * perimeter
+
+        // ONLY apply dash styling here, NOT the line width
+        var style = StrokeStyle(lineCap: .round)
+        style.dash = [dashLength, gapLength]
+        style.dashPhase = dashPhase
+
+        return Capsule().path(in: rect).strokedPath(style)
     }
 }
