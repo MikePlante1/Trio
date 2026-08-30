@@ -470,31 +470,6 @@ enum DeliveryLimitSubstep: Int, CaseIterable, Identifiable {
     }
 }
 
-enum PumpOptionForOnboardingUnits: String, Equatable, CaseIterable, Identifiable {
-    case minimed
-    case omni
-    case dana
-    case medtrum
-    case tandem
-
-    var id: String { rawValue }
-
-    var displayName: String {
-        switch self {
-        case .minimed:
-            return "Medtronic"
-        case .omni:
-            return "Omnipod"
-        case .dana:
-            return "Dana (RS/-i)"
-        case .medtrum:
-            return "Medtrum Nano"
-        case .tandem:
-            return "Tandem"
-        }
-    }
-}
-
 enum NightscoutSetupOption: String, Equatable, CaseIterable, Identifiable {
     case setupNightscout
     case skipNightscoutSetup
