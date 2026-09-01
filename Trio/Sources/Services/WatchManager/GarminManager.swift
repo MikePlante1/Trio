@@ -250,14 +250,16 @@ final class BaseGarminManager: NSObject, GarminManager, Injectable {
         settingsManager.settings.garminSettings.isWatchfaceDataEnabled
     }
 
-    /// SwissAlpine watchface and the complication app use historical glucose data (24 entries).
-    /// Trio watchface only uses current reading.
+    /// SwissAlpine watchface, the complication app, and the Chart datafield use historical
+    /// glucose data (24 entries). Trio watchface and the Trio/Swissalpine datafields only
+    /// use the current reading.
     ///
     /// The complication app needs it for the 2 h graph in its own view; the complications
     /// it publishes read only element 0 and work without history.
     private var needsHistoricalGlucoseData: Bool {
         currentWatchface == .swissalpine
             || currentWatchface == .complication
+            || currentDatafield.needsHistoricalGlucoseData
     }
 
     /// Returns the display name for an app UUID (watchface or datafield).
@@ -542,7 +544,7 @@ final class BaseGarminManager: NSObject, GarminManager, Injectable {
     // MARK: - Watch State Setup
 
     /// Builds an array of GarminWatchState objects containing current glucose, trend, loop data, and historical readings.
-    /// Historical data is included for watchfaces that support it (e.g., SwissAlpine).
+    /// Historical data is included for apps that plot it (the SwissAlpine watchface, the Chart datafield).
     /// - Parameter triggeredBy: A string describing what triggered this update (for debugging/logging).
     /// - Returns: An array of `GarminWatchState` objects with the latest watch data.
     func setupGarminWatchState(triggeredBy: String = #function) async throws -> [GarminWatchState] {
