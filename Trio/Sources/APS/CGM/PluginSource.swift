@@ -285,21 +285,7 @@ extension PluginSource: CGMManagerDelegate {
                 sensorTransmitterID = cgmTransmitterManager.state.sensorSerial
             }
 
-            // Libre 3/3+ only: the sensor flags readings it considers advisory.
-            // Trio doses on everything it stores, so drop them rather than treat
-            // them as clean. Other CGMs use isDisplayOnly differently (Dexcom
-            // sets it during calibration), so this stays plugin-scoped.
-            let dropsDisplayOnlyReadings = cgmManager is LibreLoopCGMManager
-
             let bloodGlucose = values.compactMap { newGlucoseSample -> BloodGlucose? in
-                if dropsDisplayOnlyReadings, newGlucoseSample.isDisplayOnly {
-                    debug(
-                        .deviceManager,
-                        "PLUGIN CGM - dropping display-only reading at \(newGlucoseSample.date)"
-                    )
-                    return nil
-                }
-
                 let quantity = newGlucoseSample.quantity
 
                 let value = Int(quantity.doubleValue(for: .milligramsPerDeciliter))
