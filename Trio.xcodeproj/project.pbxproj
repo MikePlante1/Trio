@@ -248,6 +248,10 @@
 		3B4BA7712D8DBD690069D5B8 /* G7SensorKit.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 3B4BA75E2D8DBD690069D5B8 /* G7SensorKit.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		3B4BA7722D8DBD690069D5B8 /* G7SensorKitUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3B4BA75F2D8DBD690069D5B8 /* G7SensorKitUI.framework */; };
 		3B4BA7732D8DBD690069D5B8 /* G7SensorKitUI.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 3B4BA75F2D8DBD690069D5B8 /* G7SensorKitUI.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		DE12FE0E2EBC0000000000B1 /* DexKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = DE12FE0E2EBC0000000000A1 /* DexKit.framework */; };
+		DE12FE0E2EBC0000000000C1 /* DexKit.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = DE12FE0E2EBC0000000000A1 /* DexKit.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		DE12FE0E2EBC0000000000B2 /* DexKitUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = DE12FE0E2EBC0000000000A2 /* DexKitUI.framework */; };
+		DE12FE0E2EBC0000000000C2 /* DexKitUI.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = DE12FE0E2EBC0000000000A2 /* DexKitUI.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		3B4BA7742D8DBD690069D5B8 /* LibreTransmitter.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3B4BA7602D8DBD690069D5B8 /* LibreTransmitter.framework */; };
 		3B4BA7752D8DBD690069D5B8 /* LibreTransmitter.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 3B4BA7602D8DBD690069D5B8 /* LibreTransmitter.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		3B4BA7762D8DBD690069D5B8 /* LibreTransmitterUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3B4BA7612D8DBD690069D5B8 /* LibreTransmitterUI.framework */; };
@@ -320,6 +324,10 @@
 		3BCE75B52D4B391F009E9453 /* Decimal+rounding.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BCE75B42D4B3917009E9453 /* Decimal+rounding.swift */; };
 		3BD6CE262DC24CFD00FA0472 /* pumphistory-24h-zoned.json in Resources */ = {isa = PBXBuildFile; fileRef = 3BD6CE252DC24CFD00FA0472 /* pumphistory-24h-zoned.json */; };
 		3BD9687C2D8DDD4600899469 /* SlideButton in Frameworks */ = {isa = PBXBuildFile; productRef = 3BD9687B2D8DDD4600899469 /* SlideButton */; };
+		DE12FE0E2EBD0000000000C1 /* SwiftECC in Frameworks */ = {isa = PBXBuildFile; productRef = DE12FE0E2EBD0000000000B1 /* SwiftECC */; };
+		DE12FE0E2EBD0000000000C2 /* BigInt in Frameworks */ = {isa = PBXBuildFile; productRef = DE12FE0E2EBD0000000000B2 /* BigInt */; };
+		DE12FE0E2EBD0000000000C3 /* ASN1 in Frameworks */ = {isa = PBXBuildFile; productRef = DE12FE0E2EBD0000000000B3 /* ASN1 */; };
+		DE12FE0E2EBD0000000000C4 /* Digest in Frameworks */ = {isa = PBXBuildFile; productRef = DE12FE0E2EBD0000000000B4 /* Digest */; };
 		5E12FE112EBC0000000000A2 /* LoopAlgorithm in Frameworks */ = {isa = PBXBuildFile; productRef = 5E12FE112EBC0000000000A1 /* LoopAlgorithm */; };
 		5E12FE112EBC0000000000B2 /* LibreCRKit in Frameworks */ = {isa = PBXBuildFile; productRef = 5E12FE112EBC0000000000B1 /* LibreCRKit */; };
 		3BD9687F2D8DDD8800899469 /* CryptoSwift in Frameworks */ = {isa = PBXBuildFile; productRef = 3BD9687E2D8DDD8800899469 /* CryptoSwift */; };
@@ -1029,6 +1037,8 @@
 			files = (
 				3B4BA78F2D8DC0EC0069D5B8 /* TidepoolServiceKit.framework in Embed Frameworks */,
 				3B4BA7732D8DBD690069D5B8 /* G7SensorKitUI.framework in Embed Frameworks */,
+				DE12FE0E2EBC0000000000C1 /* DexKit.framework in Embed Frameworks */,
+				DE12FE0E2EBC0000000000C2 /* DexKitUI.framework in Embed Frameworks */,
 				3B4BA76D2D8DBD690069D5B8 /* CGMBLEKitUI.framework in Embed Frameworks */,
 				3B4BA76B2D8DBD690069D5B8 /* CGMBLEKit.framework in Embed Frameworks */,
 				3B4BA7792D8DBD690069D5B8 /* MinimedKit.framework in Embed Frameworks */,
@@ -1346,6 +1356,8 @@
 		3B4BA75D2D8DBD690069D5B8 /* DanaKit.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; path = DanaKit.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		3B4BA75E2D8DBD690069D5B8 /* G7SensorKit.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; path = G7SensorKit.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		3B4BA75F2D8DBD690069D5B8 /* G7SensorKitUI.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; path = G7SensorKitUI.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		DE12FE0E2EBC0000000000A1 /* DexKit.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; path = DexKit.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		DE12FE0E2EBC0000000000A2 /* DexKitUI.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; path = DexKitUI.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		3B4BA7602D8DBD690069D5B8 /* LibreTransmitter.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; path = LibreTransmitter.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		3B4BA7612D8DBD690069D5B8 /* LibreTransmitterUI.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; path = LibreTransmitterUI.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		5E12FE0E2EBC0000000000A1 /* LibreLoop.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; path = LibreLoop.framework; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -2064,12 +2076,18 @@
 			files = (
 				CE95BF632BA771BE00DC3DE3 /* LoopTestingKit.framework in Frameworks */,
 				3B4BA7722D8DBD690069D5B8 /* G7SensorKitUI.framework in Frameworks */,
+				DE12FE0E2EBC0000000000B1 /* DexKit.framework in Frameworks */,
+				DE12FE0E2EBC0000000000B2 /* DexKitUI.framework in Frameworks */,
 				3B4BA7742D8DBD690069D5B8 /* LibreTransmitter.framework in Frameworks */,
 				5E12FE0E2EBC0000000000B1 /* LibreLoop.framework in Frameworks */,
 				5E12FE0E2EBC0000000000B2 /* LibreLoopUI.framework in Frameworks */,
 				3B4BA78C2D8DC0EC0069D5B8 /* ShareClientUI.framework in Frameworks */,
 				3B4BA77A2D8DBD690069D5B8 /* MinimedKitUI.framework in Frameworks */,
 				3BD9687C2D8DDD4600899469 /* SlideButton in Frameworks */,
+				DE12FE0E2EBD0000000000C1 /* SwiftECC in Frameworks */,
+				DE12FE0E2EBD0000000000C2 /* BigInt in Frameworks */,
+				DE12FE0E2EBD0000000000C3 /* ASN1 in Frameworks */,
+				DE12FE0E2EBD0000000000C4 /* Digest in Frameworks */,
 				5E12FE112EBC0000000000A2 /* LoopAlgorithm in Frameworks */,
 				5E12FE112EBC0000000000B2 /* LibreCRKit in Frameworks */,
 				3B4BA7782D8DBD690069D5B8 /* MinimedKit.framework in Frameworks */,
@@ -2738,6 +2756,8 @@
 				3B4BA75D2D8DBD690069D5B8 /* DanaKit.framework */,
 				3B4BA75E2D8DBD690069D5B8 /* G7SensorKit.framework */,
 				3B4BA75F2D8DBD690069D5B8 /* G7SensorKitUI.framework */,
+				DE12FE0E2EBC0000000000A1 /* DexKit.framework */,
+				DE12FE0E2EBC0000000000A2 /* DexKitUI.framework */,
 				3B4BA7602D8DBD690069D5B8 /* LibreTransmitter.framework */,
 				3B4BA7612D8DBD690069D5B8 /* LibreTransmitterUI.framework */,
 				5E12FE0E2EBC0000000000A1 /* LibreLoop.framework */,
@@ -4802,6 +4822,10 @@
 				CEB434FC28B90B7C00B70274 /* SwiftCharts */,
 				B958F1B62BA0711600484851 /* MKRingProgressView */,
 				3BD9687B2D8DDD4600899469 /* SlideButton */,
+				DE12FE0E2EBD0000000000B1 /* SwiftECC */,
+				DE12FE0E2EBD0000000000B2 /* BigInt */,
+				DE12FE0E2EBD0000000000B3 /* ASN1 */,
+				DE12FE0E2EBD0000000000B4 /* Digest */,
 				3BD9687E2D8DDD8800899469 /* CryptoSwift */,
 				3EA5210000000000000000A2 /* ASN1 */,
 				3EA5210000000000000000B2 /* BigInt */,
@@ -4983,6 +5007,10 @@
 				CEB434FB28B90B7C00B70274 /* XCRemoteSwiftPackageReference "SwiftCharts" */,
 				B958F1B52BA0711600484851 /* XCRemoteSwiftPackageReference "MKRingProgressView" */,
 				3BD9687A2D8DDD4600899469 /* XCRemoteSwiftPackageReference "SlideButton" */,
+				DE12FE0E2EBD0000000000A1 /* XCRemoteSwiftPackageReference "SwiftECC" */,
+				DE12FE0E2EBD0000000000A2 /* XCRemoteSwiftPackageReference "BigInt" */,
+				DE12FE0E2EBD0000000000A3 /* XCRemoteSwiftPackageReference "ASN1" */,
+				DE12FE0E2EBD0000000000A4 /* XCRemoteSwiftPackageReference "Digest" */,
 				3BD9687D2D8DDD8800899469 /* XCRemoteSwiftPackageReference "CryptoSwift" */,
 				3EA5210000000000000000A3 /* XCRemoteSwiftPackageReference "ASN1" */,
 				3EA5210000000000000000B3 /* XCRemoteSwiftPackageReference "BigInt" */,
@@ -6739,6 +6767,38 @@
 				kind = branch;
 			};
 		};
+		DE12FE0E2EBD0000000000A1 /* XCRemoteSwiftPackageReference "SwiftECC" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/leif-ibsen/SwiftECC";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 5.5.0;
+			};
+		};
+		DE12FE0E2EBD0000000000A2 /* XCRemoteSwiftPackageReference "BigInt" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/leif-ibsen/BigInt";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.24.0;
+			};
+		};
+		DE12FE0E2EBD0000000000A3 /* XCRemoteSwiftPackageReference "ASN1" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/leif-ibsen/ASN1";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.7.0;
+			};
+		};
+		DE12FE0E2EBD0000000000A4 /* XCRemoteSwiftPackageReference "Digest" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/leif-ibsen/Digest";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.13.0;
+			};
+		};
 		3BD9687D2D8DDD8800899469 /* XCRemoteSwiftPackageReference "CryptoSwift" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/krzyzanowskim/CryptoSwift";
@@ -6833,6 +6893,26 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 3BD9687A2D8DDD4600899469 /* XCRemoteSwiftPackageReference "SlideButton" */;
 			productName = SlideButton;
+		};
+		DE12FE0E2EBD0000000000B1 /* SwiftECC */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = DE12FE0E2EBD0000000000A1 /* XCRemoteSwiftPackageReference "SwiftECC" */;
+			productName = SwiftECC;
+		};
+		DE12FE0E2EBD0000000000B2 /* BigInt */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = DE12FE0E2EBD0000000000A2 /* XCRemoteSwiftPackageReference "BigInt" */;
+			productName = BigInt;
+		};
+		DE12FE0E2EBD0000000000B3 /* ASN1 */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = DE12FE0E2EBD0000000000A3 /* XCRemoteSwiftPackageReference "ASN1" */;
+			productName = ASN1;
+		};
+		DE12FE0E2EBD0000000000B4 /* Digest */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = DE12FE0E2EBD0000000000A4 /* XCRemoteSwiftPackageReference "Digest" */;
+			productName = Digest;
 		};
 		3BD9687E2D8DDD8800899469 /* CryptoSwift */ = {
 			isa = XCSwiftPackageProductDependency;

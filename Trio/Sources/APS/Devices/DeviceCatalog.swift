@@ -4,6 +4,8 @@ import AccuChekKit
 import CGMBLEKit
 import CGMBLEKitUI
 import DanaKit
+import DexKit
+import DexKitUI
 import EversenseKit
 import Foundation
 import G7SensorKit
@@ -364,17 +366,32 @@ extension DeviceCatalog {
         // just repeat them.
         // No G5 icon: CGMBLEKitUI ships only "g6", and reusing it would picture the wrong hardware.
         CGMCatalogEntry(.managed(G5CGMManager.self), manufacturer: .dexcom, name: "Dexcom G5"),
+        // Module-qualified: DexKit also exports public G6CGMManager/G7CGMManager types.
         CGMCatalogEntry(
-            .managed(G6CGMManager.self),
+            .managed(CGMBLEKit.G6CGMManager.self),
             manufacturer: .dexcom,
             name: "Dexcom G6 / ONE",
             icon: .uiBundle(identifier: "com.loopkit.CGMBLEKitUI", asset: "g6")
         ),
         CGMCatalogEntry(
-            .managed(G7CGMManager.self),
+            .managed(G7SensorKit.G7CGMManager.self),
             manufacturer: .dexcom,
             name: "Dexcom G7 / ONE+",
             icon: .uiBundle(identifier: "org.loopkit.G7SensorKitUI", asset: "g7")
+        ),
+
+        // DexKit talks to the sensor directly, with no Dexcom app or account.
+        CGMCatalogEntry(
+            .managed(DexcomG6CGMManager.self),
+            manufacturer: .dexcom,
+            name: "Dexcom G6 / ONE (direct)",
+            icon: .uiBundle(identifier: "org.nightscout.DexKitUI", asset: "g6")
+        ),
+        CGMCatalogEntry(
+            .managed(DexcomG7CGMManager.self),
+            manufacturer: .dexcom,
+            name: "Dexcom G7 / ONE+ / Stelo (direct)",
+            icon: .uiBundle(identifier: "org.nightscout.DexKitUI", asset: "g7")
         ),
 
         CGMCatalogEntry(

@@ -51,4 +51,6 @@
 [submodule "TandemKit"]
 	path = TandemKit
 	url = https://github.com/jwoglom/tandemkit
-
+[submodule "DexKit"]
+	path = DexKit
+	url = https://github.com/nightscout/DexKit.git
