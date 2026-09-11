@@ -76,6 +76,7 @@
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "BD8207C22D2B42E50023339D"
             BuildableName = "Trio Watch Complication Extension.appex"
+            BlueprintName = "Trio Watch Complication Extension"
             ReferencedContainer = "container:Trio.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
@@ -101,6 +102,7 @@
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "BD8207C22D2B42E50023339D"
             BuildableName = "Trio Watch Complication Extension.appex"
+            BlueprintName = "Trio Watch Complication Extension"
             ReferencedContainer = "container:Trio.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
