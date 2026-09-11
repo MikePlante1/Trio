@@ -967,6 +967,18 @@
         }
       }
     },
+    "NSCameraUsageDescription" : {
+      "comment" : "Privacy - Camera Usage Description",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Camera is used to scan the Data Matrix code on your Dexcom sensor packaging."
+          }
+        }
+      }
+    },
     "NSContactsUsageDescription" : {
       "comment" : "Privacy - Contacts Usage Description",
       "localizations" : {
