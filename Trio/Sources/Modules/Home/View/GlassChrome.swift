@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// Shared chrome for the Home panels: real Liquid Glass on iOS 26,
 /// material approximation below.
@@ -13,6 +14,33 @@ enum GlassChrome {
     /// Stand-in for glass/material when Reduce Transparency is on: no blur, so
     /// nothing behind the panel bleeds through.
     static let opaqueFill = Color(.secondarySystemGroupedBackground)
+
+    /// Icon tint paired with the panel's secondary label.
+    static let panelIconTint = Color(UIColor { trait in
+        trait.userInterfaceStyle == .dark ? UIColor(white: 1, alpha: 0.82) : .secondaryLabel
+    })
+}
+
+/// Panel label hierarchy. iOS 27 renders `Glass.regular` much lighter in dark mode than
+/// iOS 26 did (#181E2F -> #294459), washing out the hierarchical label styles over it.
+/// Dark mode gets an explicit lift; light mode, where the glass is unchanged, keeps
+/// SwiftUI's own `.secondary`/`.tertiary`.
+struct PanelLabel: ViewModifier {
+    enum Level { case secondary, tertiary }
+
+    let level: Level
+
+    @Environment(\.colorScheme) private var colorScheme
+
+    func body(content: Content) -> some View {
+        if colorScheme == .dark {
+            content.foregroundStyle(Color.white.opacity(level == .secondary ? 0.82 : 0.66))
+        } else if level == .secondary {
+            content.foregroundStyle(.secondary)
+        } else {
+            content.foregroundStyle(.tertiary)
+        }
+    }
 }
 
 /// Glass panel background with optional tint; pre-26 falls back to
@@ -117,4 +145,8 @@ extension View {
     func glassMaterialFill(_ shape: some InsettableShape) -> some View {
         modifier(GlassMaterialFill(shape: shape))
     }
+
+    func panelSecondaryLabel() -> some View { modifier(PanelLabel(level: .secondary)) }
+
+    func panelTertiaryLabel() -> some View { modifier(PanelLabel(level: .tertiary)) }
 }

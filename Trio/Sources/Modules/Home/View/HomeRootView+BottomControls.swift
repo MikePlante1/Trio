@@ -205,7 +205,7 @@ extension Home.RootView {
 
                 Text(overrideString)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .panelSecondaryLabel()
             }
         }
     }
@@ -218,7 +218,7 @@ extension Home.RootView {
                     .font(.subheadline).fontWeight(.semibold)
                 Text(tempTargetString)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .panelSecondaryLabel()
             }
         }
     }
@@ -296,16 +296,16 @@ extension Home.RootView {
 
     @ViewBuilder func noActiveAdjustmentsView() -> some View {
         Group {
-            adjustmentIcon("slider.horizontal.2.gobackward", tint: Color.secondary)
+            adjustmentIcon("slider.horizontal.2.gobackward", tint: GlassChrome.panelIconTint)
 
             VStack(alignment: .leading, spacing: 1) {
                 Text("No Active Adjustment")
                     .font(.subheadline).fontWeight(.medium)
-                    .foregroundStyle(.secondary)
+                    .panelSecondaryLabel()
                     .frame(maxWidth: .infinity, alignment: .leading)
                 Text("Profile at 100 %")
                     .font(.caption)
-                    .foregroundStyle(.tertiary)
+                    .panelTertiaryLabel()
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
 
@@ -604,7 +604,7 @@ extension Home.RootView {
                                         + Text("today", comment: "Stats banner scope")
                                 )
                                 .font(.subheadline)
-                                .foregroundStyle(.secondary)
+                                .panelSecondaryLabel()
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.8)
                             }
@@ -620,7 +620,7 @@ extension Home.RootView {
                                     + Text("today", comment: "Stats banner scope")
                             )
                             .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .panelSecondaryLabel()
                             .lineLimit(1)
                             .minimumScaleFactor(0.8)
 
@@ -634,7 +634,7 @@ extension Home.RootView {
                                 .foregroundStyle(.primary)
                             Text("Today's average", comment: "Stats banner subtitle")
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .panelSecondaryLabel()
                         }
                     }
 
@@ -642,7 +642,7 @@ extension Home.RootView {
 
                     Image(systemName: "chevron.right")
                         .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(.secondary)
+                        .panelSecondaryLabel()
                 }
                 .padding(.horizontal, 16)
             }
@@ -688,14 +688,14 @@ extension Home.RootView {
                             .foregroundStyle(.primary)
                         Text(subtitle)
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .panelSecondaryLabel()
                     }
 
                     Spacer(minLength: 8)
 
                     Image(systemName: "chevron.right")
                         .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(.secondary)
+                        .panelSecondaryLabel()
                 }
                 .padding(.horizontal, 16)
             }
