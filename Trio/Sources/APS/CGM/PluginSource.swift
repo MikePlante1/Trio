@@ -285,7 +285,16 @@ extension PluginSource: CGMManagerDelegate {
                 sensorTransmitterID = cgmTransmitterManager.state.sensorSerial
             }
 
+            // isDisplayOnly means "shifted for visual consistency after calibration"
+            // (LoopKit), not "unsafe to dose"; drivers withhold sensor-reported faults.
             let bloodGlucose = values.compactMap { newGlucoseSample -> BloodGlucose? in
+                if newGlucoseSample.isDisplayOnly {
+                    debug(
+                        .deviceManager,
+                        "PLUGIN CGM - display-only reading at \(newGlucoseSample.date), storing it"
+                    )
+                }
+
                 let quantity = newGlucoseSample.quantity
 
                 let value = Int(quantity.doubleValue(for: .milligramsPerDeciliter))
