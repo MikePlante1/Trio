@@ -235,10 +235,12 @@ final class BasePumpHistoryStorage: PumpHistoryStorage, Injectable {
         isScheduledBasal: Bool
     ) -> (duration: Int16, start: Date, end: Date) {
         guard !isScheduledBasal else { return (0, dose.startDate, dose.startDate) }
+        // a driver dose ending before its start is stored with no length, never a negative one
+        let end = max(dose.endDate, dose.startDate)
         return (
-            Int16(round((dose.endDate - dose.startDate).timeInterval / 60)),
+            Int16(round((end - dose.startDate).timeInterval / 60)),
             dose.startDate,
-            dose.endDate
+            end
         )
     }
 

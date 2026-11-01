@@ -544,6 +544,15 @@ final class BaseHealthKitManager: HealthKitManager, Injectable {
         // Calculate the end date based on the event duration
         let endDate = event.timestamp.addingTimeInterval(TimeInterval(minutes: Double(event.duration ?? 0)))
 
+        // HealthKit raises an uncatchable Objective-C exception for a sample ending before it starts
+        guard endDate >= event.timestamp, insulinValue >= 0 else {
+            warning(
+                .healthKit,
+                "Skipping invalid insulin sample for Apple Health: \(insulinValue) U from \(event.timestamp) to \(endDate)"
+            )
+            return nil
+        }
+
         // Create the HealthKit quantity sample with the appropriate metadata
         let sample = HKQuantitySample(
             type: sampleType,

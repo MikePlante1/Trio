@@ -225,6 +225,46 @@ import Testing
         #expect(bolusEvent?.isUploadedToTidepool == false, "Should not be uploaded to Tidepool")
     }
 
+    @Test("A temp basal ending before its start is stored with no length") func testStoreReversedTempBasal() async throws {
+        // as a driver dated a temp's start on a pump clock that had since gone back an hour
+        let detected = Date().addingTimeInterval(-10.minutes.timeInterval)
+        let pumpStart = detected.addingTimeInterval(53.minutes.timeInterval)
+        let events = [
+            LoopKit.NewPumpEvent(
+                date: pumpStart,
+                dose: LoopKit.DoseEntry(
+                    type: .tempBasal,
+                    startDate: pumpStart,
+                    endDate: detected,
+                    value: 0,
+                    unit: .unitsPerHour,
+                    deliveredUnits: 0,
+                    description: nil,
+                    syncIdentifier: nil,
+                    scheduledBasalRate: nil,
+                    insulinType: .lyumjev,
+                    automatic: false,
+                    manuallyEntered: false,
+                    isMutable: false
+                ),
+                raw: Data("reversed-temp".utf8),
+                title: "Reversed Temp Basal",
+                type: .tempBasal
+            )
+        ]
+
+        try await storage.storePumpEvents(events, replacePendingEvents: false)
+
+        let stored = try await testContext.perform {
+            try testContext.fetch(PumpEventStored.fetchRequest()).compactMap(\.tempBasal).map {
+                (duration: $0.duration, start: $0.startDate, end: $0.endDate)
+            }
+        }
+        #expect(stored.count == 1)
+        #expect(stored.first?.duration == 0, "Should not store a negative duration")
+        #expect(stored.first?.end == stored.first?.start, "Should not end before it starts")
+    }
+
     @Test("Test store function for manual boluses") func testStorePumpEventsWithManualBoluses() async throws {
         // Given
         let date = Date()
